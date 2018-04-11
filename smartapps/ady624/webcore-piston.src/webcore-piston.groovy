@@ -1610,20 +1610,22 @@ private Boolean executeTask(rtData, devices, statement, task, async) {
 		params.push p
     }
 
- 	def vcmd = rtData.commands.virtual[task.c]
+	def command = task.c == "pushMomentary" ? "push" : task.c	
+
+ 	def vcmd = rtData.commands.virtual[command]
     long delay = 0
     for (device in (virtualDevice ? [virtualDevice] : devices)) {
-        if (!virtualDevice && device.hasCommand(task.c)) {
-            def msg = timer "Executed [$device].${task.c}"
+        if (!virtualDevice && device.hasCommand(command)) {
+            def msg = timer "Executed [$device].${command}"
         	try {
-            	delay = "cmd_${task.c}"(rtData, device, params)
+            	delay = "cmd_${command}"(rtData, device, params)
             } catch(all) {
-	            executePhysicalCommand(rtData, device, task.c, params)
+	            executePhysicalCommand(rtData, device, command, params)
 			}
             if (rtData.logging > 1) trace msg, rtData
         } else {
             if (vcmd) {
-	        	delay = executeVirtualCommand(rtData, vcmd.a ? devices : device, task, params)
+	        	delay = executeVirtualCommand(rtData, vcmd.a ? devices : device, command, params)
                 //aggregate commands only run once, for all devices at the same time
                 if (vcmd.a) break
             }
@@ -1652,15 +1654,15 @@ private Boolean executeTask(rtData, devices, statement, task, async) {
     return true
 }
 
-private long executeVirtualCommand(rtData, devices, task, params)
+private long executeVirtualCommand(rtData, devices, command, params)
 {
-	def msg = timer "Executed virtual command ${devices ? (devices instanceof List ? "$devices." : "[$devices].") : ""}${task.c}"
+	def msg = timer "Executed virtual command ${devices ? (devices instanceof List ? "$devices." : "[$devices].") : ""}${command}"
     long delay = 0
     try {
-		delay = "vcmd_${task.c}"(rtData, devices, params)
+		delay = "vcmd_${command}"(rtData, devices, params)
 	    if (rtData.logging > 1) trace msg, rtData
     } catch(all) {
-    	msg.m = "Error executing virtual command ${devices instanceof List ? "$devices" : "[$devices]"}.${task.c}:"
+    	msg.m = "Error executing virtual command ${devices instanceof List ? "$devices" : "[$devices]"}.${command}:"
         msg.e = all
         error msg, rtData
     }
@@ -4284,13 +4286,14 @@ private traverseExpressions(node, closure, param, parentNode = null) {
 }
 
 private getRoutineById(routineId) {
-	def routines = location.helloHome?.getPhrases()
+    return [ id : routineId ]
+	/*def routines = location.helloHome?.getPhrases()
     for(routine in routines) {
     	if (routine && routine?.label && (hashId(routine.id) == routineId)) {
     		return routine
         }
     }
-    return null
+    return null */
 }
 
 private void updateDeviceList(deviceIdList) {
@@ -4397,7 +4400,7 @@ private void subscribeAll(rtData) {
                             	def routine = getRoutineById(value.c)
                                 if (routine) {
 	                        		subscriptionId = "$deviceId${operand.v}${routine.id}"
-    	                        	attribute = "routineExecuted.${routine.id}"
+    	                        	attribute = "routineExecuted"
                                 }
                             }
                             break
