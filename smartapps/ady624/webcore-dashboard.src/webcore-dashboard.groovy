@@ -146,35 +146,38 @@ public updatePiston(pistonId, piston) {
 private void broadcastEvent(deviceId, eventName, eventValue, eventTime) {
 	def iid = state.instanceId
     def region = state.region ?: 'us'
-    if (!iid || !iid.startsWith(':') || !iid.endsWith(':')) return
-    
-    def params = [
+
+    if (getEcosystem() == "ST") {
+        asynchttp_v1.put(null, [
             uri: "https://api-${region}-${iid[32]}.webcore.co:9237",
             path: '/event/sink',
-            requestContentType: "application/json",
             headers: ['ST' : state.instanceId],
-            body: [d: deviceId, n: eventName, v: eventValue, t: eventTime]
-        ]
-        
-    log.trace(params)
-
-    httpPut(params){
-        resp ->resp.data
-        log.info("broadcastEvent response :: ${resp.data}") 
+            body: [
+                d: deviceId,
+                n: eventName,
+                v: eventValue,
+                t: eventTime
+            ]
+        ])
     }
-    
-    /*
-    asynchttp_v1.put(null, [
-        uri: "https://api-${region}-${iid[32]}.webcore.co:9237",
-        path: '/event/sink',
-        headers: ['ST' : state.instanceId],
-        body: [
-        	d: deviceId,
-        	n: eventName,
-        	v: eventValue,
-        	t: eventTime
-    	]
-    ])*/
+    else if (getEcosystem() == "HE") {
+        if (!iid || !iid.startsWith(':') || !iid.endsWith(':')) return
+        
+        def params = [
+                uri: "https://api-${region}-${iid[32]}.webcore.co:9237",
+                path: '/event/sink',
+                requestContentType: "application/json",
+                headers: ['ST' : state.instanceId],
+                body: [d: deviceId, n: eventName, v: eventValue, t: eventTime]
+            ]
+            
+        log.trace(params)
+
+        httpPut(params){
+            resp ->resp.data
+            log.info("broadcastEvent response :: ${resp.data}") 
+        }
+    }
 }
 
 /******************************************************************************/
@@ -206,6 +209,16 @@ def String hashId(id) {
         state.hash = hash
     }
     return result
+}
+
+def getEcosystem() {
+    String hubdomain = location.getHubs().find{ it.getType().toString() == 'PHYSICAL' }
+    if (hubdomain.matches("com.hubitat(.*)")) {
+        return "HE"
+    }
+    else if (hubdomain.matches("Smartthings(.*)")) {
+        return "ST"
+    }
 }
 
 /******************************************************************************/
