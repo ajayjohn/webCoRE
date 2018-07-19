@@ -18,8 +18,9 @@
  *
  *  Version history
 */
-public static String version() { return "v0.3.104.20180323" }
+public static String version() { return "v0.3.105.20180628" }
 /*
+ *	06/28/2018 >>> v0.3.105.20180628 - BETA M3 - Reorder variables, collapse fuel streams, custom web request body, json and urlEncode functions
  *	03/23/2018 >>> v0.3.104.20180323 - BETA M3 - Fixed unexpected dashboard logouts, updating image urls in tiles, 12 am/pm in time(), unary negation following another operator
  *	02/24/2018 >>> v0.3.000.20180224 - BETA M3 - Dashboard redesign by @acd37, collapsible sidebar, fix "was" conditions on decimal attributes and log failures due to duration threshold
  *	01/16/2018 >>> v0.2.102.20180116 - BETA M2 - Fixed IE 11 script error, display of offset expression evaluation, blank device lists on piston restore, avoid error and log a warning when ST sunrise/sunset is blank
@@ -386,11 +387,13 @@ def pageMain() {
 				//trace "*** DO NOT SHARE THIS LINK WITH ANYONE *** Dashboard URL: ${getDashboardInitUrl()}"
 				href "", title: "Dashboard", style: "external", url: getDashboardInitUrl(), description: "Tap to open", image: "https://cdn.rawgit.com/ady624/${handle()}/master/resources/icons/dashboard.png", required: false
 				href "", title: "Register a browser", style: "embedded", url: getDashboardInitUrl(true), description: "Tap to open", image: "https://cdn.rawgit.com/ady624/${handle()}/master/resources/icons/browser-reg.png", required: false
-				input "customEndpoints", "bool", title: "Use custom endpoints?", default: false, required: true
-                input "customHubUrl", "string", title: "Custom hub url different from https://cloud.hubitat.com", default: null, required: false
-                input "customWebcoreInstanceUrl", "string", title: "Custom webcore instance url different from dashboard.webcore.co", default: null, required: false
-                paragraph "If you enter a custom url above you will have to use a different webcore instance from dashboard.webcore.co as they restrict their api to hubitat and smartthing's cloud"
+				input "customEndpoints", "bool", submitOnChange: true, title: "Use custom endpoints?", default: false, required: true
 
+                if(customEndpoints){
+                 	input "customHubUrl", "string", title: "Custom hub url different from https://cloud.hubitat.com", default: null, required: false
+                	input "customWebcoreInstanceUrl", "string", title: "Custom webcore instance url different from dashboard.webcore.co", default: null, required: false   
+                    paragraph "If you enter a custom url above you will have to use a different webcore instance from dashboard.webcore.co as they restrict their api to hubitat and smartthing's cloud"
+                }
 			}
 		}
 
@@ -1112,22 +1115,23 @@ private api_intf_dashboard_piston_get() {
 	} else {
     	result = api_get_error_result("ERR_INVALID_TOKEN")
     }
-    
     //for accuracy, use the time as close as possible to the render
     result.now = now()
     def jsonData = groovy.json.JsonOutput.toJson(result)
     
-	//data saver for hubitat ~100K limit    
-    def responseLength = jsonData.getBytes("UTF-8").length
-    if(responseLength > 100 * 1024){ //these are loaded anyway right after loading the piston
-        log.warn "Trimming ${ (int)(responseLength/1024) }KB response to smaller size"
-        result.instance = null
-    	result.data.logs = []
-        result.data.stats.timing = [] 
-		//for accuracy, use the time as close as possible to the render
-        result.now = now()
-        jsonData = groovy.json.JsonOutput.toJson(result)
-    }    
+    if(!customEndpoints || (customHubUrl ?: "") == ""){
+        //data saver for hubitat ~100K limit    
+        def responseLength = jsonData.getBytes("UTF-8").length
+        if(responseLength > 100 * 1024){ //these are loaded anyway right after loading the piston
+            log.warn "Trimming ${ (int)(responseLength/1024) }KB response to smaller size"
+            result.instance = null
+            result.data.logs = []
+            result.data.stats.timing = [] 
+            //for accuracy, use the time as close as possible to the render
+            result.now = now()
+            jsonData = groovy.json.JsonOutput.toJson(result)
+        } 
+    }	   
     
     //log.debug "Trimmed resonse length: ${jsonData.getBytes("UTF-8").length}"        
     render contentType: "application/javascript;charset=utf-8", data: "${params.callback}(${jsonData})"
@@ -2807,7 +2811,7 @@ private static Map virtualCommands() {
 		sendSMSNotification			: [ n: "Send SMS notification...",	a: true,	i: "commenting-o",			d: "Send SMS notification \"{0}\" to {1}{2}",							p: [[n:"Message", t:"string"],[n:"Phone number",t:"phone"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
 		sendNotificationToContacts	: [ n: "Send notification to contacts...",a: true,i: "commenting-o",		d: "Send notification \"{0}\" to {1}{2}",								p: [[n:"Message", t:"string"],[n:"Contacts",t:"contacts"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
 		log							: [ n: "Log to console...",			a: true,	i: "bug",					d: "Log {0} \"{1}\"{2}",												p: [[n:"Log type", t:"enum", o:["info","trace","debug","warn","error"]],[n:"Message",t:"string"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
-		httpRequest					: [ n: "Make a web request",		a: true, 	i: "anchor",				d: "Make a {1} request to {0} with type {2}{3}",				        p: [[n:"URL", t:"uri"],[n:"Method", t:"enum", o:["GET","POST","PUT","DELETE","HEAD"]],[n:"Content Type", t:"enum", o:["JSON","FORM"]],[n:"Send variables", t:"variables", d:" and data {v}"],[n:"Authorization header", t:"string", d:"{v}"]],	],
+		httpRequest					: [ n: "Make a web request",		a: true, 	i: "anchor",				d: "Make a {1} request to {0}",				        p: [[n:"URL", t:"uri"],[n:"Method", t:"enum", o:["GET","POST","PUT","DELETE","HEAD"]],[n:"Request body type", t:"enum", o:["JSON","FORM","CUSTOM"]],[n:"Send variables", t:"variables", d:"data {v}"],[n:"Request body", t:"string", d:"data {v}"],[n:"Request content type", t:"enum", o:["text/plain","text/html","application/json","application/x-www-form-urlencoded","application/xml"]],[n:"Authorization header", t:"string", d:"{v}"]],	],
         setVariable					: [ n: "Set variable...",			a: true,	i: "superscript",			d: "Set variable {0} = {1}",											p: [[n:"Variable",t:"variable"],[n:"Value", t:"dynamic"]],	],
         setState					: [ n: "Set piston state...",		a: true,	i: "superscript",			d: "Set piston state to \"{0}\"",										p: [[n:"State",t:"string"]],	],
         setTileColor				: [ n: "Set piston tile colors...",	a: true,	i: "superscript",			d: "Set piston tile #{0} colors to {1} over {2}{3}",					p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Text Color",t:"color"],[n:"Background Color",t:"color"],[n:"Flash mode",t:"boolean",d:" (flashing)"]],	],
@@ -3054,6 +3058,9 @@ private static Map functions() {
         rangevalue		: [ t: "dynamic",	d: "rangeValue"		],
         rainbowvalue	: [ t: "string",	d: "rainbowValue"	],
         distance		: [ t: "decimal"						],
+        json		: [ t: "dynamic"						],
+        urlencode		: [ t: "string",	d: "urlEncode"					],
+        encodeuricomponent		: [ t: "string",	d: "encodeURIComponent"					],
 	]
 }
 
@@ -3084,7 +3091,7 @@ private static Map getAlarmSystemStatusOptions() {
 
 
 private Map getRoutineOptions(updateCache = false) {
-	def routines = location.helloHome?.getPhrases()
+	def routines = location.helloHome?.getPhrases()?.sort{ it?.label ?: '' }
     def result = [:]
     for(routine in routines) {
     	if (routine && routine?.label)

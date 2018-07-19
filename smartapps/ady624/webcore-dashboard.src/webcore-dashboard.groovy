@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-public static String version() { return "v0.3.104.20180323" }
+public static String version() { return "v0.3.105.20180628" }
 /******************************************************************************/
 /*** webCoRE DEFINITION														***/
 /******************************************************************************/
@@ -156,10 +156,7 @@ private void broadcastEvent(deviceId, eventName, eventValue, eventTime) {
             body: [d: deviceId, n: eventName, v: eventValue, t: eventTime]
         ]
     
-    httpPut(params){
-        resp ->resp.data
-        log.info("broadcastEvent response :: ${resp.data}") 
-    }
+    asynchttpPut((String)null, params)
     
     /*
     asynchttp_v1.put(null, [
