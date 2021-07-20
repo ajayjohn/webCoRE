@@ -18,8 +18,23 @@
  *
  *  Version history
 */
-public static String version() { return "v0.3.104.20180323" }
+public static String version() { return "v0.3.113.20210203" }
 /*
+ *	02/03/2021 >>> v0.3.113.20210203 - BETA M3 - Fixed GET, HEAD, DELETE web requests that used Send Variables (broken in 0.3.112)
+ *	02/02/2021 >>> v0.3.112.20210202 - BETA M3 - Fixed FORM type web requests that used Send Variables (broken in 0.3.111), improved a few confusing log messages
+ *	01/30/2021 >>> v0.3.111.20210130 - BETA M3 - Numerous bug fixes, performance improvements for HTTP, *CLEAR index to reset list variables, reset access token
+ *	10/09/2019 >>> v0.3.110.20191009 - BETA M3 - Load devices into dashboard in multiple batches when necessary, switch to FontAwesome Kit to always use latest version
+ *	08/22/2019 >>> v0.3.10f.20190822 - BETA M3 - Custom headers on web requests by @Bloodtick_Jones (write as JSON in Authorization header field), capabilities split into three pages to fix device selection errors
+ *	06/28/2019 >>> v0.3.10e.20190628 - BETA M3 - Reinstated dirty fix for dashboard timeouts after reports of increased error rates, NaN device status is back
+ *	06/27/2019 >>> v0.3.10d.20190627 - BETA M3 - Reverted attempted fix for dashboard timeouts, fixes NaN device status on piston editing, dashboard tweaks for Hubitat by E_Sch
+ *	05/22/2019 >>> v0.3.10c.20190522 - BETA M3 - Changed the device selection page in main app to fix timeout issues in Asia-Pacific
+ *	05/14/2019 >>> v0.3.10b.20190514 - BETA M3 - Changed the device selection page to fix timeout issues in Asia-Pacific
+ *	02/23/2019 >>> v0.3.10a.20190223 - BETA M3 - Added $twcweather to replace discontinued $weather, added new :twc-[iconCode]: weather icon set, fixed content type for local HTTP requests
+ *	12/07/2018 >>> v0.3.109.20181207 - BETA M3 - Dirty fix for dashboard timeouts: seems like ST has a lot of trouble reading the list of devices/commands/attributes/values these days, so giving up on reading values makes this much faster - temporarily?!
+ *	09/06/2018 >>> v0.3.108.20180906 - BETA M3 - Restore pistons from backup file, hide "(unknown)" SHM status, fixed string to date across DST thanks @bangali, null routines, integer trailing zero cast, saving large pistons and disappearing variables on mobile
+ *	08/06/2018 >>> v0.3.107.20180806 - BETA M3 - Font Awesome 5 icons, expanding textareas to fix expression scrolling, boolean date and datetime global variable editor fixes
+ *	07/31/2018 >>> v0.3.106.20180731 - BETA M3 - Contact Book removal support
+ *	06/28/2018 >>> v0.3.105.20180628 - BETA M3 - Reorder variables, collapse fuel streams, custom web request body, json and urlEncode functions
  *	03/23/2018 >>> v0.3.104.20180323 - BETA M3 - Fixed unexpected dashboard logouts, updating image urls in tiles, 12 am/pm in time(), unary negation following another operator
  *	02/24/2018 >>> v0.3.000.20180224 - BETA M3 - Dashboard redesign by @acd37, collapsible sidebar, fix "was" conditions on decimal attributes and log failures due to duration threshold
  *	01/16/2018 >>> v0.2.102.20180116 - BETA M2 - Fixed IE 11 script error, display of offset expression evaluation, blank device lists on piston restore, avoid error and log a warning when ST sunrise/sunset is blank
@@ -611,7 +626,8 @@ Map pause() {
     if (rtData.logging) info "Stopping piston...", rtData, 0
     checkVersion(rtData)
     state.schedules = []
-    rtData.stats.nextSchedule = 0
+    rtData.stats.nextSchedule = 0L
+    state.nextSchedule = 0L
     unsubscribe()
     unschedule()
     app.updateSetting('dev', null)
@@ -702,7 +718,7 @@ private getRunTimeData(rtData = null, semaphore = null, fetchWrappers = false) {
 	    rtData.id = appId
 		rtData.active = state.active;
         rtData.category = state.category;
-	    rtData.stats = [nextScheduled: 0]
+	    rtData.stats = [nextSchedule: 0L]
 	    //we're reading the cache from atomicState because we might have waited at a semaphore
 	    rtData.cache = atomicState.cache ?: [:]
 	    rtData.newCache = [:]
@@ -1128,24 +1144,29 @@ private processSchedules(rtData, scheduleJob = false) {
         }
     }*/
     if (scheduleJob) {
+        Long nextT=0L
         if (schedules.size()) {
-    		def next = schedules.sort{ it.t }[0]
-        	def t = (next.t - now()) / 1000
-        	t = (t < 1 ? 1 : t)
-        	rtData.stats.nextSchedule = next.t
-        	if (rtData.logging) info "Setting up scheduled job for ${formatLocalTime(next.t)} (in ${t}s)" + (schedules.size() > 1 ? ', with ' + (schedules.size() - 1).toString() + ' more job' + (schedules.size() > 2 ? 's' : '') + ' pending' : ''), rtData
-        	runIn(t, timeHandler, [data: next])
-        	//runIn(t + 30, timeRecoveryHandler, [data: next])
-    	} else {
-	    	rtData.stats.nextSchedule = 0
+    		def tnext = schedules.sort{ it.t }[0]
+		nextT=(Long)tnext.t
+        	Long t = (nextT - now()) / 1000
+        	t = (t < 1L ? 1L : t)
+        	if (rtData.logging) info "Setting up scheduled job for ${formatLocalTime(nextT)} (in ${t}s)" + (schedules.size() > 1 ? ', with ' + (schedules.size() - 1).toString() + ' more job' + (schedules.size() > 2 ? 's' : '') + ' pending' : ''), rtData
+		Integer t1=Math.round(t)
+        	runIn(t1, timeHandler, [data: tnext])
+        	//runIn(t + 30, timeRecoveryHandler, [data: tnext])
+    	}
+    	if(nextT==0L && (Long)state.nextSchedule!=0L){
+                unschedule(timeHandler)
             //remove the recovery
     		//unschedule(timeRecoveryHandler)
-	    }
+	}
+        	rtData.stats.nextSchedule = nextT
+	state.nextSchedule=nextT
     }
     if (rtData.piston.o?.pep) atomicState.schedules = schedules
     state.schedules = schedules
-    state.schedules = schedules
-    state.nextSchedule = rtData.stats.nextSchedule
+    //state.schedules = schedules
+    //state.nextSchedule = rtData.stats.nextSchedule
     rtData.schedules = []
 }
 
@@ -1355,12 +1376,14 @@ private Boolean executeStatement(rtData, statement, async = false) {
                     double endValue = 0
                     double stepValue = 1
                     if (statement.t == 'each') {
-                        devices = evaluateOperand(rtData, null, statement.lo).v ?: []
+                        def t0 = evaluateOperand(rtData, null, statement.lo).v
+                        devices = t0 ?: []
                         endValue = devices.size() - 1
                     } else {
                     	startValue = evaluateScalarOperand(rtData, statement, statement.lo, null, 'decimal').v
                     	endValue = evaluateScalarOperand(rtData, statement, statement.lo2, null, 'decimal').v
-                    	stepValue = evaluateScalarOperand(rtData, statement, statement.lo3, null, 'decimal').v ?: 1.0
+                    	Double t0 = evaluateScalarOperand(rtData, statement, statement.lo3, null, 'decimal').v
+                    	stepValue = t0 ?: 1.0
                     }
                     String counterVariable = getVariable(rtData, statement.x).t != 'error' ? statement.x : null
                     if (((startValue <= endValue) && (stepValue > 0)) || ((startValue >= endValue) && (stepValue < 0)) || !!rtData.fastForwardTo) {
@@ -1371,8 +1394,8 @@ private Boolean executeStatement(rtData, statement, async = false) {
 	                        rtData.cache["f:${statement.$}"] = index
                         }
                         setSystemVariableValue(rtData, '$index', index)
-						if ((statement.t == 'each') && !rtData.fastForward) setSystemVariableValue(rtData, '$device', (index < devices.size() ? [devices[(int) index]] : []))
-                        if (counterVariable && !rtData.fastForward) setVariable(rtData, counterVariable, (statement.t == 'each') ? (index < devices.size() ? [devices[(int) index]] : []) : index)
+						if ((statement.t == 'each') && !rtData.fastForwardTo) setSystemVariableValue(rtData, '$device', (index < devices.size() ? [devices[(int) index]] : []))
+                        if (counterVariable && !rtData.fastForwardTo) setVariable(rtData, counterVariable, (statement.t == 'each') ? (index < devices.size() ? [devices[(int) index]] : []) : index)
                         //do the loop
                         perform = executeStatements(rtData, statement.s, async)
                         if (!perform) {
@@ -1390,8 +1413,8 @@ private Boolean executeStatement(rtData, statement, async = false) {
                         if (!!rtData.fastForwardTo) break
                         index = index + stepValue
                         setSystemVariableValue(rtData, '$index', index)
-						if ((statement.t == 'each') && !rtData.fastForward) setSystemVariableValue(rtData, '$device', (index < devices.size() ? [devices[(int) index]] : []))
-                        if (counterVariable && !rtData.fastForward) setVariable(rtData, counterVariable, (statement.t == 'each') ? (index < devices.size() ? [devices[(int) index]] : []) : index)
+						if ((statement.t == 'each') && !rtData.fastForwardTo) setSystemVariableValue(rtData, '$device', (index < devices.size() ? [devices[(int) index]] : []))
+                        if (counterVariable && !rtData.fastForwardTo) setVariable(rtData, counterVariable, (statement.t == 'each') ? (index < devices.size() ? [devices[(int) index]] : []) : index)
                         rtData.cache["f:${statement.$}"] = index
                         if (((stepValue > 0 ) && (index > endValue)) || ((stepValue < 0 ) && (index < endValue))) {
                         	perform = false
@@ -1489,7 +1512,9 @@ private Boolean executeStatement(rtData, statement, async = false) {
         }
     }
 	if (!rtData.fastForwardTo) {
-    	def schedule = (statement.t == 'every') ? (rtData.schedules.find{ it.s == statement.$} ?: state.schedules.find{ it.s == statement.$ }) : null
+    	Boolean tt0 = (String)statement.t == 'every'
+    	def t0 = tt0 ? rtData.schedules.find{ it.s == statement.$} : null
+    	def schedule = tt0 ? (t0!=null ? t0 : state.schedules.find{ it.s == statement.$ }) : null
         if (schedule) {
         	//timers need to show the remaining time
     		tracePoint(rtData, "s:${statement.$}", now() - t, now() - schedule.t)
@@ -1607,7 +1632,7 @@ private Boolean executeTask(rtData, devices, statement, task, async) {
     	def p
     	switch (param.vt) {
         	case 'variable':
-            	p = param.x instanceof List ? param.x : (param.x + (param.xi != null ? '[' + param.xi + ']' : ''));
+                if (param.t == 'x') p = param.x instanceof List ? param.x : (param.x + (param.xi != null ? '[' + param.xi + ']' : ''));
                 break;
             default:
             	def v = evaluateOperand(rtData, null, param)
@@ -2781,18 +2806,11 @@ private long vcmd_sendSMSNotification(rtData, device, params) {
 }
 
 private long vcmd_sendNotificationToContacts(rtData, device, params) {
+	// Contact Book has been disabled and we're falling back onto PUSH notifications, if the option is enabled in the SmartApp's settings
+    if (!rtData.redirectContactBook) return 0
 	def message = params[0]
-    List contacts = (params[1] instanceof List ? params[1] : params[1].toString().tokenize(',')).unique();
-	List recipients = rtData.contacts.findAll{ it.key in contacts }.collect{ it.value }
-    if (recipients.size()) {
-        if (recipients && recipients.size()) {
-			def save = !!params[2]
-			sendNotificationToContacts(message, recipients, [event: save, view: [name: "webCoRE", data: [:]]])
-        }
-	} else {
-    	error "Invalid list of contacts: ${params[1]}", rtData
-    }
-    return 0
+    def save = !!params[2]
+    return vcmd_sendPushNotification(rtData, devices, [message, save])
 }
 
 
@@ -2854,10 +2872,13 @@ private long vcmd_resumePiston(rtData, device, params) {
 }
 
 private long vcmd_executeRoutine(rtData, device, params) {
-	def routineId = params[0]
-    def routine = location.helloHome?.getPhrases().find{ hashId(it.id) == routineId }
-    if (routine) {
-	    location.helloHome?.execute(routine.label)
+    def routineId = params[0]
+    def routines = location.helloHome?.getPhrases()
+    if (routines) {
+        def routine = routines.find{ hashId(it.id) == routineId }
+        if (routine) {
+            location.helloHome?.execute(routine.label)
+        }
     }
     return 0
 }
@@ -3196,11 +3217,22 @@ public localHttpRequestHandler(physicalgraph.device.HubResponse hubResponse) {
 private long vcmd_httpRequest(rtData, device, params) {
 	def uri = params[0].replace(" ", "%20")
 	def method = params[1]
-	def contentType = params[2]
+	def useQueryString = method == 'GET' || method == 'DELETE' || method == 'HEAD'
+	def requestBodyType = params[2]
 	def variables = params[3]
-    def auth = params.size() > 4 ? params[4] : '';
+    def auth = null
+    def requestBody = null
+    def contentType = null
+    if (params.size() == 5) {
+	    auth = params[4];
+    } else if (params.size() == 7) {
+        requestBody = params[4]
+        contentType = params[5] ?: 'text/plain'
+        auth = params[6];
+    }
     if (!uri) return false
 	def protocol = "https"
+	def requestContentType = (method == "GET" || requestBodyType == "FORM") ? "application/x-www-form-urlencoded" : (requestBodyType == "JSON") ? "application/json" : contentType
     def userPart = ""
 	def uriParts = uri.split("://").toList()
 	if (uriParts.size() > 2) {
@@ -3228,11 +3260,16 @@ private long vcmd_httpRequest(rtData, device, params) {
 		}
 	}
 	def data = null
-	if (variables instanceof List) {
+    if (requestBodyType == 'CUSTOM' && !useQueryString) {
+	    data = requestBody
+    } else if (variables instanceof List) {
     	for(variable in variables.findAll{ !!it }) {
         	data  = data ?: [:]
 			data[variable] = getVariable(rtData, variable).v
 		}
+    }
+    if (!useQueryString && requestContentType == 'application/x-www-form-urlencoded' && data instanceof Map) {
+        data = data.collect{ k,v -> "${encodeURIComponent(k)}=${encodeURIComponent(v)}" }.join('&')
     }
 	if (internal) {
 		try {
@@ -3244,9 +3281,10 @@ private long vcmd_httpRequest(rtData, device, params) {
 				path: (uri.indexOf("/") > 0) ? uri.substring(uri.indexOf("/")) : "",
 				headers: [
 					HOST: userPart + ip,
-				] + (auth ? [Authorization: auth] : [:]),
-				query: method == "GET" ? data : null, //thank you @destructure00
-				body: method != "GET" ? data : null //thank you @destructure00
+					'Content-Type': requestContentType
+				] + (auth ? ((auth.startsWith('{') && auth.endsWith('}')) ? ( new groovy.json.JsonSlurper().parseText( auth ) ) : [Authorization : auth]) : [:]),
+				query: useQueryString ? data : null, //thank you @destructure00
+				body: !useQueryString ? data : null //thank you @destructure00
 			]
 			sendHubCommand(new physicalgraph.device.HubAction(requestParams, null, [callback: localHttpRequestHandler]))
             return 20000
@@ -3258,60 +3296,33 @@ private long vcmd_httpRequest(rtData, device, params) {
 			if (rtData.logging > 2) debug "Sending external web request to: $uri", rtData
 			def requestParams = [
 				uri:  "${protocol}://${userPart}${uri}",
-				query: method == "GET" ? data : null,
-                headers: (auth ? [Authorization: auth] : [:]),
-				requestContentType: (method != "GET") && (contentType == "JSON") ? "application/json" : "application/x-www-form-urlencoded",
-				body: method != "GET" ? data : null
+				query: useQueryString ? data : null,
+				headers: (auth ? ((auth.startsWith('{') && auth.endsWith('}')) ? ( new groovy.json.JsonSlurper().parseText( auth ) ) : [Authorization : auth]) : [:]),
+				requestContentType: requestContentType,
+				body: !useQueryString ? data : null
 			]
 			def func = ""
 			switch(method) {
 				case "GET":
-					func = "httpGet"
+					func = "get"
 					break
 				case "POST":
-					func = "httpPost"
+					func = "post"
 					break
 				case "PUT":
-					func = "httpPut"
+					func = "put"
 					break
 				case "DELETE":
-					func = "httpDelete"
+					func = "delete"
 					break
 				case "HEAD":
-					func = "httpHead"
+					func = "head"
 					break
 			}
 			if (func) {
-				"$func"(requestParams) { response ->
-					setSystemVariableValue(rtData, "\$httpContentType", response.contentType)
-					setSystemVariableValue(rtData, "\$httpStatusCode", response.status)
-					setSystemVariableValue(rtData, "\$httpStatusOk", (response.status >= 200) && (response.status <= 299))
-                    def binary = false
-                    def mediaType = response.contentType.toLowerCase()
-                    switch (mediaType) {
-                    	case 'image/jpeg':
-                    	case 'image/png':
-                    	case 'image/gif':
-                        	binary = true
-                    }
-					if ((response.status == 200) && response.data && !binary) {
-						try {
-							rtData.response = response.data instanceof Map ? response.data : (LinkedHashMap) new groovy.json.JsonSlurper().parseText(response.data)
-						} catch (all) {
-                        	rtData.response = response.data
-						}
-					} else {
-                    	rtData.response = null
-                        if (response.data && (response.data instanceof java.io.ByteArrayInputStream)) {
-	                        rtData.mediaType = mediaType
-    	                    rtData.mediaData = response.data.getBytes()
-                        } else {
-	                        rtData.mediaType = null
-    	                    rtData.mediaData = null
-                        }
-                        rtData.mediaUrl = null;
-                    }
-				}
+    //if (asynchttp_v1) asynchttp_v1.put(asyncHttpRequestHandler, requestParams, [command: 'storeMedia'])
+				asynchttp_v1."$func"(ahttpRequestHandler, requestParams, [command: 'httpRequest'])
+				return 24000
 			}
 		} catch (all) {
 			error "Error executing external web request: ", rtData, null, all
@@ -3320,6 +3331,50 @@ private long vcmd_httpRequest(rtData, device, params) {
 	return 0
 }
 
+public void ahttpRequestHandler(response, callbackData){
+	def data
+	def json
+	Map setRtData=[mediaData:null, mediaType:null, mediaUrl:null] as Map
+	String callBackC=(String)callbackData?.command
+	def responseCode = response.status
+	String mediaType = ""
+	if(responseCode == 204) {
+	}else if(responseCode >= 200 && responseCode < 300 && response.data ){ 
+		Boolean binary = false
+		def t0=response.getHeaders()
+		String t1=t0 && t0."Content-Type" ? t0."Content-Type":(String)null
+		mediaType=t1 ? (String)(t1.toLowerCase()?.tokenize(';')[0]):(String)null
+		switch (mediaType) {
+			case 'image/jpeg':
+			case 'image/png':
+			case 'image/gif':
+			binary = true
+		}
+		if(!binary) {
+			data = response.data
+			if (data && data instanceof Map ) {
+			} else {
+				try{
+					data=(LinkedHashMap) new groovy.json.JsonSlurper().parseText(response.data)
+				} catch (all){
+					data=response.data
+				}
+			}
+		} else {
+			if(response.data && response.data instanceof java.io.ByteArrayInputStream){
+				setRtData.mediaType=mediaType
+				setRtData.mediaData=response.data.getBytes()
+			}
+		}
+	}
+	if (response.hasError()) {
+		String msg =  "Status $response.status raw response: $response.errorData,  error on response: $response.errorMessage"
+		error "Error executing external web request: "+msg, [:]
+		if(!responseCode) responseCode=500
+	}
+
+	handleEvents([date: new Date(), device: location, name: 'wc_async_reply', value: 'httpRequest', contentType: mediaType, responseData: data, jsonData: json, responseCode: responseCode, setRtData: setRtData])
+}
 
 private long vcmd_writeToFuelStream(rtData, device, params) {
 	def canister = params[0]
@@ -3801,7 +3856,6 @@ private Boolean evaluateCondition(rtData, condition, collection, async) {
                 if (lo) for (value in lo.values) updateCache(rtData, value)
                 if (ro) for (value in ro.values) updateCache(rtData, value)
                 if (ro2) for (value in ro2.values) updateCache(rtData, value)
-                if (rtData.fastForwardTo == null) tracePoint(rtData, "c:${condition.$}", now() - t, result)
                 if (lo.operand.dm && options.devices) setVariable(rtData, lo.operand.dm, options.devices?.matched ?: [])
                 if (lo.operand.dn && options.devices) setVariable(rtData, lo.operand.dn, options.devices?.unmatched ?: [])
                 //do the stay logic here
@@ -3854,6 +3908,7 @@ private Boolean evaluateCondition(rtData, condition, collection, async) {
                 result = oldResult
             }
         }
+        if (rtData.fastForwardTo == null) tracePoint(rtData, "c:${condition.$}", now() - t, result)
     }
     rtData.wakingUp = false
     rtData.conditionStateChanged = oldResult != result
@@ -4056,7 +4111,7 @@ private boolean valueWas(rtData, comparisonValue, rightValue, rightValue2, timeV
     }
     if (!duration) return false
     result = (timeValue.f == 'l') ? duration < threshold : duration >= threshold
-    debug "Duration ${duration}ms for ${func.replace('is_', 'was_')} ${timeValue.f == 'l' ? '<' : '>='} ${threshold}ms threshold = ${result}", rtData
+    if (rtData.logging > 2) debug "Duration ${duration}ms for ${func.replace('is_', 'was_')} ${timeValue.f == 'l' ? '<' : '>='} ${threshold}ms threshold = ${result}", rtData
     return result
 }
 
@@ -4138,9 +4193,9 @@ private boolean comp_executes						(rtData, lv, rv = null, rv2 = null, tv = null
 private boolean comp_arrives						(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return (rtData.event.name == 'email') && match(rtData.event?.jsonData?.from ?: '', evaluateExpression(rtData, rv.v, 'string').v) && match(rtData.event?.jsonData?.message ?: '', evaluateExpression(rtData, rv2.v, 'string').v) }
 private boolean comp_happens_daily_at				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return rtData.wakingUp }
 
-private boolean comp_changes						(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return valueCacheChanged(rtData, lv) && matchDeviceInteraction(lv.p, rtData.currentEvent.physical); }
-private boolean comp_changes_to						(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return valueCacheChanged(rtData, lv) && ("${lv.v.v}" == "${rv.v.v}") && matchDeviceInteraction(lv.p, rtData.currentEvent.physical); }
-private boolean comp_changes_away_from				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && ("${oldValue.v.v}" == "${rv.v.v}") && matchDeviceInteraction(lv.p, rtData.currentEvent.physical); }
+private boolean comp_changes						(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return valueCacheChanged(rtData, lv) && matchDeviceInteraction(lv.v.p, rtData.currentEvent.physical); }
+private boolean comp_changes_to						(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return valueCacheChanged(rtData, lv) && ("${lv.v.v}" == "${rv.v.v}") && matchDeviceInteraction(lv.v.p, rtData.currentEvent.physical); }
+private boolean comp_changes_away_from				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && ("${oldValue.v.v}" == "${rv.v.v}") && matchDeviceInteraction(lv.v.p, rtData.currentEvent.physical); }
 private boolean comp_drops							(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && (cast(rtData, oldValue.v.v, 'decimal') > cast(rtData, lv.v.v, 'decimal')); }
 private boolean comp_does_not_drop					(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return !comp_drops(rtData, lv, rv, rv2, tv, tv2); }
 private boolean comp_drops_below					(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && (cast(rtData, oldValue.v.v, 'decimal') >= cast(rtData, rv.v.v, 'decimal')) && (cast(rtData, lv.v.v, 'decimal') < cast(rtData, rv.v.v, 'decimal')); }
@@ -4162,8 +4217,8 @@ private boolean comp_becomes_odd					(rtData, lv, rv = null, rv2 = null, tv = nu
 private boolean comp_remains_even					(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && (cast(rtData, oldValue.v.v, 'integer').mod(2) == 0) && (cast(rtData, lv.v.v, 'integer').mod(2) == 0); }
 private boolean comp_remains_odd					(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return oldValue && (cast(rtData, oldValue.v.v, 'integer').mod(2) != 0) && (cast(rtData, lv.v.v, 'integer').mod(2) != 0); }
 
-private boolean comp_changes_to_any_of				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return !!valueCacheChanged(rtData, lv) && comp_is_any_of(rtData, lv, rv, rv2, tv, tv2) && matchDeviceInteraction(lv.p, rtData.currentEvent.physical); }
-private boolean comp_changes_away_from_any_of		(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return !!oldValue && comp_is_any_of(rtData, oldValue, rv, rv2) && matchDeviceInteraction(lv.p, rtData.currentEvent.physical); }
+private boolean comp_changes_to_any_of				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return !!valueCacheChanged(rtData, lv) && comp_is_any_of(rtData, lv, rv, rv2, tv, tv2) && matchDeviceInteraction(lv.v.p, rtData.currentEvent.physical); }
+private boolean comp_changes_away_from_any_of		(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { def oldValue = valueCacheChanged(rtData, lv); return !!oldValue && comp_is_any_of(rtData, oldValue, rv, rv2) && matchDeviceInteraction(lv.v.p, rtData.currentEvent.physical); }
 
 private boolean comp_stays							(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return comp_is(rtData, lv, rv, rv2, tv, tv2); }
 private boolean comp_stays_unchanged				(rtData, lv, rv = null, rv2 = null, tv = null, tv2 = null) { return true; }
@@ -4954,6 +5009,7 @@ private Map getResponse(rtData, name) {
 }
 
 private Map getWeather(rtData, name) {
+    warn 'The Weather Underground data source used by $weather will soon be shut down; please see https://wiki.webcore.co/TWC_Weather', rtData
 	List parts = name.tokenize('.');
     rtData.weather = rtData.weather ?: [:]
     if (parts.size() > 0) {
@@ -4963,6 +5019,31 @@ private Map getWeather(rtData, name) {
         }
     }
 	return getJsonData(rtData, rtData.weather, name)
+}
+
+private Map getTwcWeather(rtData, name) {
+	List parts = name.tokenize('.[');
+    rtData.twcWeather = rtData.twcWeather ?: [:]
+    if (parts.size() > 0) {
+    	def dataFeature = parts[0]
+        if (rtData.twcWeather[dataFeature] == null) {
+            switch (dataFeature) {
+                case 'alerts':
+                    rtData.twcWeather[dataFeature] = app.getTwcAlerts()
+                    break
+                case 'conditions':
+                    rtData.twcWeather[dataFeature] = app.getTwcConditions()
+                    break
+                case 'forecast':
+                    rtData.twcWeather[dataFeature] = app.getTwcForecast()
+                    break
+                case 'location':
+                    rtData.twcWeather[dataFeature] = app.getTwcLocation()?.location
+                    break
+            }
+        }
+    }
+	return getJsonData(rtData, rtData.twcWeather, name)
 }
 
 private Map getNFLDataFeature(dataFeature) {
@@ -5037,6 +5118,8 @@ private Map getVariable(rtData, name) {
             	result = getNFL(rtData, name.substring(5))
             } else if (name.startsWith('$weather.') && (name.size() > 9)) {
             	result = getWeather(rtData, name.substring(9))
+            } else if (name.startsWith('$twcweather.') && (name.size() > 12)) {
+            	result = getTwcWeather(rtData, name.substring(12))
         	} else if (name.startsWith('$incidents.') && (name.size() > 11)) {
             	result = getIncidents(rtData, name.substring(11))
         	} else if (name.startsWith('$incidents[') && (name.size() > 11)) {
@@ -5112,12 +5195,16 @@ private Map setVariable(rtData, name, value) {
             if (variable.t.endsWith(']')) {
             	//we're dealing with a list
                 variable.v = (variable.v instanceof Map) ? variable.v : [:]
-                Map indirectVar = getVariable(rtData, var.index)
-                //indirect variable addressing
-                if (indirectVar && (indirectVar.t != 'error')) {
-                    var.index = cast(rtData, indirectVar.v, 'string', indirectVar.t)
+                if (var.index == "*CLEAR")	{
+                    variable.v.clear()
+                } else {
+                    Map indirectVar = getVariable(rtData, var.index)
+                    //indirect variable addressing
+                    if (indirectVar && (indirectVar.t != 'error')) {
+                        var.index = cast(rtData, indirectVar.v, 'string', indirectVar.t)
+                    }
+                    variable.v[var.index] = cast(rtData, value, variable.t.replace('[]', ''))
                 }
-                variable.v[var.index] = cast(rtData, value, variable.t.replace('[]', ''))
             } else {
             	variable.v = cast(rtData, value, variable.t)
             }
@@ -5137,7 +5224,8 @@ private Map setVariable(rtData, name, value) {
 def setLocalVariable(name, value) {
 	name = sanitizeVariableName(name)
     if (!name || name.startsWith('@')) return
-	def vars = atomicState.vars ?: [:]
+	def t0 = atomicState.vars
+	def vars = t0!=null ? t0 : [:]
     vars[name] = value
     atomicState.vars = vars
     return vars
@@ -5805,6 +5893,26 @@ private func_fahrenheit(rtData, params) {
     double t = evaluateExpression(rtData, params[0], 'decimal').v
     //convert temperature to Fahrenheit
     return [t: "decimal", v: (double) t * 9.0 / 5.0 + 32.0]
+}
+
+
+/******************************************************************************/
+/*** fahrenheit converts temperature between Celsius and Fahrenheit if the  ***/
+/*** units differ from location.temperatureScale                            ***/
+/*** Usage: convertTemperatureIfNeeded(celsiusTemperature, 'C')             ***/
+/******************************************************************************/
+private func_converttemperatureifneeded(rtData, params) {
+    if (!params || !(params instanceof List) || (params.size() < 2)) {
+        return [t: "error", v: "Invalid parameters. Expecting convertTemperatureIfNeeded(temperature, unit)"];
+    }
+    double t = evaluateExpression(rtData, params[0], 'decimal').v
+    def u = evaluateExpression(rtData, params[1], 'string').v.toUpperCase()
+    //convert temperature to Fahrenheit
+    switch (location.temperatureScale) {
+       case u: return [t: "decimal", v: t]
+       case 'F': return func_celsius(rtData, [params[0]])
+       case 'C': return func_fahrenheit(rtData, [params[0]])
+   }
 }
 
 /******************************************************************************/
@@ -7133,6 +7241,32 @@ private func_distance(rtData, params) {
 	return [t: 'decimal', v: dist]
 }
 
+/******************************************************************************/
+/*** json encodes data as a JSON string					***/
+/*** Usage: json(value[, pretty])									***/
+/******************************************************************************/
+private func_json(rtData, params) {
+	if (!params || !(params instanceof List) || (params.size() < 1) || (params.size() > 2)) {
+    	return [t: "error", v: "Invalid parameters. Expecting json(value[, format])"];
+    }
+    def builder = new groovy.json.JsonBuilder([params[0].v])
+    def op = params[1] ? 'toPrettyString' : 'toString'
+    def json = builder."${op}"()
+    return [t: 'string', v: json[1..-2].trim()]
+}
+
+/******************************************************************************/
+/*** percent encodes data for use in a URL					***/
+/*** Usage: urlencode(value)									***/
+/******************************************************************************/
+private func_urlencode(rtData, params) {
+	if (!params || !(params instanceof List) || (params.size() != 1)) {
+    	return [t: "error", v: "Invalid parameters. Expecting urlencode(value])"];
+    }
+    def value = (evaluateExpression(rtData, params[0], 'string').v ?: '')
+    return [t: 'string', v: encodeURIComponent(value)]
+}
+private func_encodeuricomponent(rtData, params) { return func_urlencode(rtData, params); }
 
 /******************************************************************************/
 /*** 																		***/
@@ -7149,6 +7283,16 @@ def mem(showBytes = true) {
 /*** UTILITIES																***/
 /***																		***/
 /******************************************************************************/
+
+def encodeURIComponent(value) {
+    // URLEncoder converts spaces to + which is then indistinguishable from any 
+    // actual + characters in the value. Match encodeURIComponent in ECMAScript
+    // which encodes "a+b c" as "a+b%20c" rather than URLEncoder's "a+b+c"
+    return URLEncoder.encode(
+        "${value}".toString().replaceAll('\\+', '__wc_plus__'), 
+        'UTF-8'
+    ).replaceAll('\\+', '%20').replaceAll('__wc_plus__', '+')
+}
 
 def String md5(String md5) {
    try {
@@ -7245,7 +7389,8 @@ private cast(rtData, value, dataType, srcDataType = null) {
             	case 'boolean': return value ? "true" : "false";
             	case 'decimal':
                 	//if (value instanceof Double) return sprintf('%f', value)
-                    return value.toString().replaceFirst(/\.?(0+)$/, '')
+                    // strip trailing zeroes (e.g. 5.00 to 5 and 5.030 to 5.03)
+                    return value.toString().replaceFirst(/(?:\.|(\.\d*?))0+$/, '$1')
             	case 'integer':
             	case 'long': break; if (value > 9999999999) { return formatLocalTime(value) }; break;
                 case 'time': return formatLocalTime(value, 'h:mm:ss a z');
@@ -7438,7 +7583,11 @@ private localToUtcTime(dateOrTimeOrString) {
 	if (dateOrTimeOrString instanceof String) {
 		//get unix time
         try {
-        	return (new Date()).parse(dateOrTimeOrString + (!(dateOrTimeOrString =~ /(\s[A-Z]{3}((\+|\-)[0-9]{2}\:[0-9]{2}|\s[0-9]{4})?$)/)? ' ' + formatLocalTime(now(), 'z') : ''))
+            if (!(dateOrTimeOrString =~ /(\s[A-Z]{3}((\+|\-)[0-9]{2}\:[0-9]{2}|\s[0-9]{4})?$)/)) {
+                def newDate = (new Date()).parse(dateOrTimeOrString + ' ' + formatLocalTime(now(), 'Z'))
+                return newDate + (location.timeZone.getOffset(now()) - location.timeZone.getOffset(newDate))
+            }
+            return (new Date()).parse(dateOrTimeOrString)
 		} catch (all) {
         	try {
 	        	return (new Date(dateOrTimeOrString)).getTime()
@@ -7593,7 +7742,7 @@ private List hexToRgbArray(hex) {
 /******************************************************************************/
 /*** DEBUG FUNCTIONS														***/
 /******************************************************************************/
-private log(message, rtData = null, shift = null, err = null, cmd = null, force = false) {
+private Map log(message, rtData = null, shift = null, err = null, cmd = null, force = false) {
     if (cmd == "timer") {
     	return [m: message, t: now(), s: shift, e: err]
     }
@@ -7659,12 +7808,12 @@ private log(message, rtData = null, shift = null, err = null, cmd = null, force 
 		log."$cmd" "$prefix $message", err
     }
 }
-private info(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'info' }
-private trace(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'trace' }
-private debug(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'debug' }
-private warn(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'warn' }
-private error(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'error' }
-private timer(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'timer' }
+private void info(message, rtData = null, shift = null, err = null) { def a=log message, rtData, shift, err, 'info' }
+private void trace(message, rtData = null, shift = null, err = null) { def a=log message, rtData, shift, err, 'trace' }
+private void debug(message, rtData = null, shift = null, err = null) { def a=log message, rtData, shift, err, 'debug' }
+private void warn(message, rtData = null, shift = null, err = null) { def a=log message, rtData, shift, err, 'warn' }
+private void error(message, rtData = null, shift = null, err = null) { def a=log message, rtData, shift, err, 'error' }
+private Map timer(message, rtData = null, shift = null, err = null) { log message, rtData, shift, err, 'timer' }
 
 private tracePoint(rtData, objectId, duration, value) {
 	if (objectId && rtData && rtData.trace) {
@@ -7794,6 +7943,7 @@ private static Map getSystemVariables() {
         '$places': [t: "dynamic", d: true],
         '$response': [t: "dynamic", d: true],
         '$weather': [t: "dynamic", d: true],
+        '$twcweather': [t: "dynamic", d: true],
         '$nfl': [t: "dynamic", d: true],
         '$incidents': [t: "dynamic", d: true],
         '$shmTripped': [t: "boolean", d: true],
@@ -7871,7 +8021,8 @@ private static Map getSystemVariables() {
 		"\$iftttStatusOk": [t: "boolean", v: null],
 		"\$locationMode": [t: "string", d: true],
 		"\$shmStatus": [t: "string", d: true],
-        "\$version": [t: "string", d: true]
+		"\$version": [t: "string", d: true],
+		"\$temperatureScale": [t: "string", d: true]
 	].sort{it.key}
 }
 
@@ -7882,6 +8033,7 @@ private getSystemVariableValue(rtData, name) {
     	case '$places': return "${rtData.settings?.places}".toString()
     	case '$response': return "${rtData.response}".toString()
         case '$weather': return "${rtData.weather}".toString()
+        case '$twcweather': return "${rtData.twcWeather}".toString()
         case '$nfl': return "${rtData.nfl}".toString()
         case '$incidents': return "${rtData.incidents}".toString()
         case '$shmTripped': initIncidents(rtData); return !!((rtData.incidents instanceof List) && (rtData.incidents.size()))
@@ -7924,6 +8076,7 @@ private getSystemVariableValue(rtData, name) {
 		case "\$randomHue": def result = getRandomValue("\$randomHue") ?: (int)Math.round(360 * Math.random()); setRandomValue("\$randomHue", result); return result
   		case "\$locationMode": return location.getMode()
 		case "\$shmStatus": switch (hubUID ? 'off' : location.currentState("alarmSystemStatus")?.value) { case 'off': return 'Disarmed'; case 'stay': return 'Armed/Stay'; case 'away': return 'Armed/Away'; }; return null;
+		case "\$temperatureScale": return location.getTemperatureScale()
     }
 }
 

@@ -22,9 +22,9 @@
 
 <!--External links // collapsed on xs-->
 	<ul class="nav navbar-nav navbar-right hidden-xs">
-			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://www.paypal.me/ady624"><i class="fa fa-paypal" aria-hidden="true"></i>&nbsp;&nbsp;Donate</a></li>
-			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://community.webcore.co"><i class="fa fa-comments" aria-hidden="true"></i>&nbsp;&nbsp;Forum</a></li>
-			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://wiki.webcore.co"><i class="fa fa-book" aria-hidden="true"></i>&nbsp;&nbsp;Wiki</a></li>
+			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://www.paypal.me/ady624"><i class="fab fa-paypal"></i>&nbsp;&nbsp;Donate</a></li>
+			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://community.webcore.co"><i class="fa fa-comments"></i>&nbsp;&nbsp;Forum</a></li>
+			<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://wiki.webcore.co"><i class="fa fa-book"></i>&nbsp;&nbsp;Wiki</a></li>
 	</ul>
 
 <!-- Nav links and content -->
@@ -33,7 +33,7 @@
         <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">{{location.name}} \ {{instance ? instance.name + ' (' + instance.coreVersion.split('.').splice(0,3).join('.') + ')' : 'loading...'}}<span class="caret"></span></a>
             <ul class="dropdown-menu">
               <li role="separator" class="dropdown-header" ng-repeat-start="l in locations" ng-init="instances = listInstances(l.id)">{{l.name}}</li>
-            	<li instance ng-repeat="i in instances" ng-repeat-end class="{{i.id == instance.id ? 'active-tick' : ''}}" ng-click="switchInstance(i.id);"><a>{{l.name}} \ {{i.name}} ({{i.coreVersion.split('.').splice(0,3).join('.')}})</a></li>
+            	<li instance ng-repeat="i in instances" ng-repeat-end ng-click="switchInstance(i.id);"><a><checkbox checked="i.id == instance.id" radio="true" icon-class="fa-lg fa-fw"></checkbox> {{l.name}} \ {{i.name}} ({{i.coreVersion.split('.').splice(0,3).join('.')}})</a></li>
             </ul>
         </li>
 			</ul>
@@ -41,17 +41,17 @@
 				<li class="dropdown">
  					<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Options <span class="caret"></span></a>
           <ul class="dropdown-menu">
-            <li><a href="#" ng-click="newPiston();"><i class="fa fa-plus" aria-hidden="true"></i>&nbsp;&nbsp;New Piston</a></li>
-						<li><a href="#" ng-click="showDashboard();"><i class="fa fa-th-list" aria-hidden="true"></i>&nbsp;&nbsp;Dashboard</a></li>
-						<li><a href="#" ng-click="showFuelStreams();"><i class="fa fa-area-chart" aria-hidden="true"></i>&nbsp;&nbsp;Fuel Streams</a></li>
-						<li><a href="" ng-click="backup();"><i class="fa fa-cloud-upload" aria-hidden="true"></i>&nbsp;&nbsp;Backup Piston(s)</a></li>
-            <li ng-if="instanceCount > 1"><a href="#" ng-click="movePiston();"><i class="fa fa-sort" aria-hidden="true"></i>Move Piston(s)</a></li>
-            <li><a href="register"><i class="fa fa-home" aria-hidden="true"></i>&nbsp;&nbsp;Register Instance</a></li>
-            <li><a href="#" ng-click="showSettings()"><i class="fa fa-wrench" aria-hidden="true"></i>&nbsp;&nbsp;Settings</a></li>
-						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://www.paypal.me/ady624"><i class="fa fa-paypal" aria-hidden="true"></i>&nbsp;&nbsp;Donate</a></li>
-						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://community.webcore.co"><i class="fa fa-comments" aria-hidden="true"></i>&nbsp;&nbsp;Forum</a></li>
-						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://wiki.webcore.co"><i class="fa fa-book" aria-hidden="true"></i>&nbsp;&nbsp;Wiki</a></li>
-						<li><a href="#" ng-click="logOut();"><i class="fa fa-sign-out" aria-hidden="true"></i>&nbsp;&nbsp;Log Out</a></li>
+						<li><a href="#" ng-click="newPiston();"><i class="fa fa-plus fa-lg fa-fw"></i>&nbsp;&nbsp;New Piston</a></li>
+						<li><a href="#" ng-click="showDashboard();"><i class="fas fa-th-large fa-lg fa-fw"></i>&nbsp;&nbsp;Dashboard</a></li>
+						<li><a href="#" ng-click="showFuelStreams();"><i class="fas fa-chart-area fa-lg fa-fw"></i>&nbsp;&nbsp;Fuel Streams</a></li>
+						<li><a href="" ng-click="backup();"><i class="fas fa-cloud-upload-alt fa-lg fa-fw"></i>&nbsp;&nbsp;Backup Piston(s)</a></li>
+						<li ng-if="instanceCount > 1"><a href="#" ng-click="movePiston();"><i class="fas fa-sort fa-lg fa-fw"></i>Move Piston(s)</a></li>
+						<li><a href="register"><i class="fas fa-home fa-lg fa-fw"></i>&nbsp;&nbsp;Register Instance</a></li>
+						<li><a href="#" ng-click="showSettings()"><i class="fas fa-wrench fa-lg fa-fw"></i>&nbsp;&nbsp;Settings</a></li>
+						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://www.paypal.me/ady624"><i class="fab fa-paypal fa-lg fa-fw"></i>&nbsp;&nbsp;Donate</a></li>
+						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://community.webcore.co"><i class="fas fa-comments fa-lg fa-fw"></i>&nbsp;&nbsp;Forum</a></li>
+						<li><a target="_blank" aria-haspopup="true" aria-expanded="false" href="https://wiki.webcore.co"><i class="fas fa-book fa-lg fa-fw"></i>&nbsp;&nbsp;Wiki</a></li>
+						<li><a href="#" ng-click="logOut();"><i class="fas fa-sign-out-alt fa-lg fa-fw"></i>&nbsp;&nbsp;Log Out</a></li>
 					</ul>
 				</li>
 			</ul>
@@ -61,6 +61,8 @@
 <!--End navigation-->
 
 <viewer class="dashboard animated noPreventDefault {{dropDownMenu ? 'reveal' : ''}}" ng-if="initialized && (view == 'dashboard')">
+	<!-- Too big of a hassle to convert all these FA 4 pseudo elements to FA 5 -->
+	<link rel="stylesheet" ng-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css" />
 	<nav fixed class="navbar navbar-default navbar-fixed-topw" ng-if="initialized && (view == 'dashboard')">
 		<div class="container-fluid">
 			<ul class="nav navbar-nav navbar-right">
@@ -73,7 +75,7 @@
 	<tiles masonry='{"transitionDuration": "0s", "itemSelector": "tile"}' class="noPreventDefault" ng-wheel="onWheel($event)" ng-swipe-up="onSwipe($event, 'up')" ng-swipe-down="onSwipe($event, 'down')">
 		<tile ng-repeat="device in devices" class="col-lg-1 col-md-1 col-sm-2 col-xs-3 col-xxs-6" tile-height="{{determineDeviceType(device) == 'presenceSensor' ? 2 : 1}}">
 			<content>
-				<refresh ng-if="refreshing"><i class="fa fa-refresh fa-spin fa-3x fa-fw"></i></refresh>
+				<refresh ng-if="refreshing"><i class="fas fa-sync fa-spin fa-3x fa-fw"></i></refresh>
 				<device type="{{device.t}}" dev-data="device.data" ng-style="!!device.data.color ? {'text-shadow': '0px 0px 150px ' + device.data.color} : {}">
 					<level ng-if="device.data.level != null"></level>
 					<power ng-if="device.data.power != null"></power>
@@ -95,35 +97,37 @@
 </viewer>
 
 <viewer class="pistons" ng-if="initialized && ((view == 'piston') || (view == 'settings'))" class="no-animate">
+	<i data-fa-symbol="ellipsis-v" class="far fa-ellipsis-v svg-inline--fa"></i>
+	<i data-fa-symbol="circle" class="fas fa-circle svg-inline--fa"></i>
 	<div class="body container-fluid">
 		<div class="row">
 			<div id="dashboardSidebar" class="sidebar no-ng-animate" ng-class="{ 'sidebar-collapsed': sidebarCollapsed, 'allow-transition': completedInitialRender }" collapse-target collapse-class="">
 				<ul class="nav nav-sidebar">
 					<li class="logo"><img class="logo-sm" src="img/webCoRE-mark.svg" alt="webCoRE logo"><img class="logo-lg" src="img/webCoRE-text.svg" width="90%"></li>
 					<li><a href="" ng-click="newPiston();" class="newPiston" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="New Piston">
-						<i class="fa fa-plus" aria-hidden="true"></i>&nbsp;&nbsp;New Piston
+						<i class="fas fa-plus"></i>&nbsp;&nbsp;New Piston
 					</a></li>
 					<li><a href="" ng-click="showDashboard();" class="dash" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Dashboard (beta)">
-						<i class="fa fa-th-list" aria-hidden="true"></i>&nbsp;&nbsp;Dashboard (beta)
+						<i class="fas fa-th-large"></i>&nbsp;&nbsp;Dashboard (beta)
 					</a></li>
 					<li><a href="" ng-click="showFuelStreams();" class="fuel" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Fuel Streams (beta)">
-						<i class="fa fa-area-chart" aria-hidden="true"></i>&nbsp;&nbsp;Fuel Streams (beta)
+						<i class="fas fa-chart-area"></i>&nbsp;&nbsp;Fuel Streams (beta)
 					</a></li>
 					<li><a href="" ng-click="backup();" class="backup" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Backup Piston(s)">
-						<i class="fa fa-cloud-upload" aria-hidden="true"></i>&nbsp;&nbsp;Backup Piston(s)
+						<i class="fas fa-cloud-upload-alt"></i>&nbsp;&nbsp;Backup Piston(s)
 					</a></li>
 					<li><a href="register" class="register" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Register Instance">
-						<i class="fa fa-home" aria-hidden="true"></i>&nbsp;&nbsp;Register Instance
+						<i class="fas fa-home"></i>&nbsp;&nbsp;Register Instance
 					</a></li>
 					<li ng-if="instanceCount > 1"><a href="" ng-click="movePiston();" class="move" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Move Piston(s)">
-						<i class="fa fa-sort" aria-hidden="true"></i>&nbsp;&nbsp;Move Piston(s)
+						<i class="fas fa-sort"></i>&nbsp;&nbsp;Move Piston(s)
 					</a></li>
 					<li><a href="" ng-click="showSettings();" class="settings" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Settings">
-						<i class="fa fa-wrench" aria-hidden="true"></i>&nbsp;&nbsp;Settings
+						<i class="fas fa-wrench"></i>&nbsp;&nbsp;Settings
 					</a></li>
 					<li>
 					<li><a href="#" ng-click="logOut();" class="logout" data-toggle="{{sidebarCollapsed ? 'tooltip' : ''}}" data-placement="right" data-title="Log Out">
-						<i class="fa fa-sign-out" aria-hidden="true"></i>&nbsp;&nbsp;Log Out
+						<i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;Log Out
 					</a></li>
 					<li class="text-center">
 						
@@ -147,8 +151,8 @@
 
 <!--					<ul class="socialmedia">
 					<li>
-						<a href="https://twitter.com/ady624/lists/webcore" target="webCoRE:twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a>
-						<a href="https://www.facebook.com/groups/1023785497757470" target="webCoRE:fb"><i class="fa fa-facebook" aria-hidden="true"></i></a>
+						<a href="https://twitter.com/ady624/lists/webcore" target="webCoRE:twitter"><i class="fa fa-twitter"></i></a>
+						<a href="https://www.facebook.com/groups/1023785497757470" target="webCoRE:fb"><i class="fab fa-facebook"></i></a>
 				        <div class="fb-like" data-href="https://dashboard.webcore.co" data-layout="button_count" data-action="like" data-size="small" data-show-faces="false" data-share="false" ng-init="initSocialMedia()"></div>
 					</li>
 					<li>
@@ -159,35 +163,38 @@
 			<div class="main no-ng-animate" ng-class="{ 'sidebar-collapsed': sidebarCollapsed, 'allow-transition': completedInitialRender }">
 				<span ng-click="toggleSidebar()" class="fa fa-caret-left collapse-control" collapse-control data-target="#dashboardSidebar"></span>
 				<div lonely ng-if="!loading && !instance.pistons.length">
-					<i class="fa fa-frown-o" aria-hidden="true"></i>
+					<i class="far fa-frown"></i>
 					<div>It's kinda lonely in here...<br/>How about <a ng-click="newPiston();">creating a piston</a>?</div>
 				</div>
 				<!--<div class="alert alert-warning" ng-if="devices && (devices.length > 50)">It is recommended that the list of available devices does not exceed 50 items. You have selected a total of {{devices.length}} available devices for this instance. While not a problem, you may experience slower start-up times for your pistons. If you do, please consider breaking this instance into at least two instances and group the pistons in such a way that each instance requires less than 50 available devices. Multpile instances can safely share the same device.</div>-->
 				<div class="table-responsive no-animate topinfo" ng-if="instance">
-					<hub ng-repeat="hub in location.hubs" ng-if="hub.physical" power-source="{{hub.powerSource}}"><span>{{hub.name}}</span><span fw>{{hub.firmware}}</span></hub>
+					<hub ng-repeat="hub in location.hubs" ng-if="hub.physical" power-source="{{hub.powerSource}}"><i class="fas fa-battery-full" ng-if="hub.powerSource === 'battery'"></i><span>{{hub.name}}</span><span fw>{{hub.firmware}}</span></hub>
 					<location-mode data-toggle="tooltip" title="Location mode is {{getLocationMode()}}">{{getLocationMode()}}</location-mode>
-					<shm-mode data-toggle="tooltip" title="Smart Home Monitor is {{getSHMModeName()}}" ng-if="location.shm" alert="{{location.incidents && (location.incidents.length > 0)}}" mode="{{location.shm}}">{{getSHMModeName()}}</shm-mode>
+					<shm-mode data-toggle="tooltip" title="Smart Home Monitor is {{getSHMModeName()}}" ng-if="location.shm && location.shm !== 'unconfigured'" alert="{{location.incidents && (location.incidents.length > 0)}}" mode="{{location.shm}}">{{getSHMModeName()}}</shm-mode>
 					<incident ng-repeat="incident in location.incidents" source-type="{{incident.sourceType}}" ng-bind-html="renderIncident(incident)"></incident>
 				</div>
 				<div class="no-animate alert alert-warning" ng-if="instance && permanentStatus" role="alert" ng-bind-html="permanentStatus"></div>
+				<div warning ng-if="canResumeImport" class="alert alert-info">
+					Would you like to resume importing pistons? <a href="#" ng-click="resumeImport()" class="alert-link">Continue your import</a> or if the import is complete <a href="#" ng-click="restartPistonImport()" class="alert-link">reset import data</a>
+				</div>
 				<div class="table-responsive no-animate" ng-repeat="category in categories" ng-if="instance && category.p && category.p.length && (category.t != 'h')">
 					<label ng-if="category.n">{{category.n}} ({{category.p.length}})</label>
 					<table class="table" ng-if="(category.t == 'd') || (category.t == 'dt') || (category.t == 'dm') || (category.t == 'dl')">
 						<tbody>
 							<tr ng-repeat="piston in category.p" active="true" ng-if="piston.meta && piston.meta.a" data-toggle="tooltip" title="{{piston.meta.t ? 'Executed ' + timeSince(piston.meta.t) : 'Never executed'}}">
-								<td ng-click="openPiston(piston.id);"><span><i star class="fa fa-circle" ng-style="{opacity: piston.opacity}" aria-hidden="true"></i>{{piston.name}}<span state ng-bind-html="renderString(piston.meta.s.new)"></span><!--<span ng-if="piston.meta.s && piston.meta.s.new" state="{{piston.meta.s.new}}">{{piston.meta.s.new}}</span>--></span></td>
+								<td ng-click="openPiston(piston.id);"><span><svg star class="sprite-icon fa-xs" symbol="circle" ng-style="{opacity: piston.opacity}"></svg>{{piston.name}}<span state ng-bind-html="piston.meta.s.new | renderString"></span><!--<span ng-if="piston.meta.s && piston.meta.s.new" state="{{piston.meta.s.new}}">{{piston.meta.s.new}}</span>--></span></td>
 								<td ng-click="openPiston(piston.id);" dur class="col-md-1 text-right">{{piston.meta.n ? timeCounter(piston.meta.n) : ''}}</td>
-								<td ng-if="!mobile" opt><i class="fa fa-ellipsis-v" aria-hidden="true"></i><actions class="animated"><action ng-click="pausePiston(piston.id);" data-toggle="tooltip" title="Pause piston">Pause</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
+								<td ng-if="!mobile" opt><svg class="sprite-icon" symbol="ellipsis-v"></svg><actions class="animated"><action ng-click="pausePiston(piston.id);" data-toggle="tooltip" title="Pause piston">Pause</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
 
 							</tr>
 						</tbody>
 					</table>
 					<ptiles ng-if="(category.t == 't') || (category.t == 'm') || (category.t == 'l') || (category.t == 'dt') || (category.t == 'dm') || (category.t == 'dl') || (category.t == 'td') || (category.t == 'md') || (category.t == 'ld')">
 						<ptilegroup ng-repeat="piston in category.p" ng-if="piston.meta && piston.meta.a">
-							<ptile ng-repeat="index in range(16) track by $index" class="{{category.t.indexOf('l') >= 0 ? 'large' : (category.t.indexOf('m') >= 0 ? 'medium' : '')}}" ng-if="piston.meta.s['i' + ($index + 1)] || piston.meta.s['t' + ($index + 1)]" tile-meta="piston.meta.s" tile-index="$index" ng-click="clickPistonTile($event, piston, ($index + 1));" data-toggle="tooltip" title="{{renderString(piston.meta.s.new)}}" ng-style="{color: piston.meta.s['c' + ($index + 1)], backgroundColor: piston.meta.s['b' + ($index + 1)]}" class="{{piston.meta.s['f' + ($index + 1)] ? 'blink' : ''}}" type="{{meta.type ? meta.type : ''}}" ng-attr-wide="{{!!meta && !!meta.options && (meta.options.wide == '1') ? '' : undefined}}">
-								<div ng-if-start="!meta.type" title data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 24 : (category.t.indexOf('m') >= 0 ? 18 : 12)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['i' + ($index + 1)] ? renderString(piston.meta.s['i' + ($index + 1)]) : '--'"></div>
-								<div data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 72 : (category.t.indexOf('m') >= 0 ? 54 : 36)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['t' + ($index + 1)] ? renderString(piston.meta.s['t' + ($index + 1)]) : '--'"></div>
-								<div ng-if-end title data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 24 : (category.t.indexOf('m') >= 0 ? 18 : 12)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['o' + ($index + 1)] ? renderString(piston.meta.s['o' + ($index + 1)]) : (piston.meta.n ? timeCounter(piston.meta.n) : ' ')"></div>
+							<ptile ng-repeat="index in range(16) track by $index" class="{{category.t.indexOf('l') >= 0 ? 'large' : (category.t.indexOf('m') >= 0 ? 'medium' : '')}}" ng-if="piston.meta.s['i' + ($index + 1)] || piston.meta.s['t' + ($index + 1)]" tile-meta="piston.meta.s" tile-index="$index" ng-click="clickPistonTile($event, piston, ($index + 1));" data-toggle="tooltip" title="{{(piston.meta.s['p' + ($index +1)] ? piston.meta.s['p' + ($index + 1)] : piston.meta.s.new) | renderString}}" ng-style="{color: piston.meta.s['c' + ($index + 1)], backgroundColor: piston.meta.s['b' + ($index + 1)]}" class="{{piston.meta.s['f' + ($index + 1)] ? 'blink' : ''}}" type="{{meta.type ? meta.type : ''}}" ng-attr-wide="{{!!meta && !!meta.options && (meta.options.wide == '1') ? '' : undefined}}">
+								<div ng-if-start="!meta.type" title data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 24 : (category.t.indexOf('m') >= 0 ? 18 : 12)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['i' + ($index + 1)] ? (piston.meta.s['i' + ($index + 1)] | renderString) : '--'"></div>
+								<div data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 72 : (category.t.indexOf('m') >= 0 ? 54 : 36)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['t' + ($index + 1)] ? (piston.meta.s['t' + ($index + 1)] | renderString) : '--'"></div>
+								<div ng-if-end title data-fittext data-fittext-max="{{category.t.indexOf('l') >= 0 ? 24 : (category.t.indexOf('m') >= 0 ? 18 : 12)}}" ng-model="piston.meta.s" ng-bind-html="piston.meta.s['o' + ($index + 1)] ? (piston.meta.s['o' + ($index + 1)] | renderString) : (piston.meta.n ? timeCounter(piston.meta.n) : ' ')"></div>
 								<div ng-if="meta.type == 'gauge'" google-chart chart="getGaugeChart(piston, $index, meta)"></div>
 								<video ng-if="(meta.type == 'video') && !!meta.options && !!meta.options.src" class="{{meta.className}}" ng-attr-controls="{{meta.options.controls == '0' ? undefined : ''}}" ng-attr-autoplay="{{meta.options.autoplay == '1' ? '' : undefined}}" ng-attr-loop="{{meta.options.loop == '1' ? '' : undefined}}" ng-attr-muted="{{meta.options.muted == '1' ? '' : undefined}}">
 									<source ng-src="{{meta.options.src}}"  />
@@ -199,9 +206,9 @@
 					<table class="table" ng-if="(category.t == 'td') || (category.t == 'tm') || (category.t == 'tl')">
 						<tbody>
 							<tr ng-repeat="piston in category.p" active="true" ng-if="piston.meta && piston.meta.a" data-toggle="tooltip" title="{{piston.meta.t ? 'Executed ' + timeSince(piston.meta.t) : 'Never executed'}}">
-								<td ng-click="openPiston(piston.id);"><span><i star class="fa fa-circle" ng-style="{opacity: piston.opacity}" aria-hidden="true"></i>{{piston.name}}<span state ng-bind-html="renderString(piston.meta.s.new)"></span><!--<span ng-if="piston.meta.s && piston.meta.s.new" state="{{piston.meta.s.new}}">{{piston.meta.s.new}}</span>--></span></td>
+								<td ng-click="openPiston(piston.id);"><span><svg star class="sprite-icon fa-xs" symbol="circle" ng-style="{opacity: piston.opacity}"></svg>{{piston.name}}<span state ng-bind-html="piston.meta.s.new | renderString"></span><!--<span ng-if="piston.meta.s && piston.meta.s.new" state="{{piston.meta.s.new}}">{{piston.meta.s.new}}</span>--></span></td>
 								<td ng-click="openPiston(piston.id);" dur class="col-md-1 text-right">{{piston.meta.n ? timeCounter(piston.meta.n) : ''}}</td>
-								<td ng-if="!mobile" opt><i class="fa fa-ellipsis-v" aria-hidden="true"></i><actions class="animated"><action ng-click="pausePiston(piston.id);" data-toggle="tooltip" title="Pause piston">Pause</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
+								<td ng-if="!mobile" opt><svg class="sprite-icon" symbol="ellipsis-v"></svg><actions class="animated"><action ng-click="pausePiston(piston.id);" data-toggle="tooltip" title="Pause piston">Pause</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
 
 							</tr>
 						</tbody>
@@ -214,7 +221,7 @@
 							<tr ng-repeat="piston in pausedPistons"  active="false" ng-if="!piston.meta || !piston.meta.a" data-toggle="tooltip" title="{{piston.meta.t ? 'Paused on ' + utcToString(piston.meta.t) : ''}}">
 								<td ng-click="openPiston(piston.id);"><span>{{piston.name}}</span></td>
 								<td ng-click="openPiston(piston.id);" class="col-md-1 text-right">{{piston.meta.n ? timeCounter(piston.meta.n) : ''}}</td>
-								<td ng-if="!mobile" opt><i class="fa fa-ellipsis-v" aria-hidden="true"></i><actions class="animated"><action ng-click="resumePiston(piston.id);" data-toggle="tooltip" title="Resume piston">Resume</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
+								<td ng-if="!mobile" opt><svg class="sprite-icon" symbol="ellipsis-v"></svg><actions class="animated"><action ng-click="resumePiston(piston.id);" data-toggle="tooltip" title="Resume piston">Resume</action><action ng-click="testPiston(piston.id);" data-toggle="tooltip" title="Test piston">Test</action><action ng-click="openPiston(piston.id);" data-toggle="tooltip" title="View/Edit piston">View</action></actions></td>
 							</tr>
 						</tbody>
 					</table>
@@ -262,7 +269,7 @@
 						<i class="fa fa-chevron-down catop" ng-if="$index < settings.categories.length - 1" ng-click="moveCategoryDown($index)"></i>
 					</div>
 					<div class="col-xs-1">
-						<i class="fa fa-close catop" ng-click="deleteCategory($index)"></i>
+						<i class="fas fa-times catop" ng-click="deleteCategory($index)"></i>
 					</div>
 				</div>
 				<div class="">
@@ -308,7 +315,7 @@
 </div>
 <div class="tab-pane active form-horizontal" id="places">
 	<div ng-repeat="place in settings.places" class="place" ng-click="editPlace(place)">
-	    <footer><i ng-if="!!place.h" class="fa fa-home" aria-hidden="true"></i>{{place.n}}</footer>
+	    <footer><i ng-if="!!place.h" class="fa fa-home"></i>{{place.n}}</footer>
 	    <ng-map center="{{place.p}}" zoom="14" mayTypeId="TERRAIN" controls="false" disable-default-u-i="true" pan-control="false" zoom-control="false" scale-control="false">
 	    <marker position="{{place.p}}" draggable="false"></marker>
 	    <shape name="circle" editable="false" draggable="false"
@@ -330,7 +337,7 @@
 	      radius="{{place.o}}">
 	    </shape>
 	  </ng-map>
-	</div><div ng-if="!!settings.places.length && isAppHosted && !presenceSensorId" class="place device" ng-click="registerPresenceSensor()"><i class="fa fa-map-marker" aria-hidden="true"></i><footer>Setup sensor</footer></div><div ng-if="settings.places.length < 10" class="place new" ng-click="addPlace()"></div>
+	</div><div ng-if="!!settings.places.length && isAppHosted && !presenceSensorId" class="place device" ng-click="registerPresenceSensor()"><i class="fas fa-map-marker-alt"></i><footer>Setup sensor</footer></div><div ng-if="settings.places.length < 10" class="place new" ng-click="addPlace()"></div>
 </div>
   </div>
 	<form class="form-horizontal">
@@ -399,7 +406,7 @@
       </header>
       <items>
            <item ng-repeat="item in designer.items" type="{{item.type}}" class="btn btn-block btn-lg {{item.cssClass}}" ng-click="setDesignerType(item.type)">
-             <i class="fa fa-lg fa-{{item.icon}}"></i>
+             <i class="fal fa-lg fa-{{item.icon}}"></i>
              {{item.name}}
           </item>
       </items>
@@ -407,26 +414,62 @@
 <designer ng-if="designer.page==1">
       <header ng-if="designer.type=='blank'">
           <h3>Create a new blank piston</h3>
-          <span>You are about to create a new piston from scratch. Yey! Click Create to get started.</span>
+          <span>You are about to create a new piston from scratch.</span>
       </header>
       <header ng-if="designer.type=='duplicate'">
           <h3>Create a duplicate piston</h3>
           <span>You are about to create a duplicate piston. Select the source piston below and click Create to get started.</span>
       </header>
-      <header ng-if="designer.type=='template'">
-          <h3>Create new piston from a template</h3>
-          <span>You wanted to create a new piston from a template. The bad news is, there are no templates yet :( But the good news is, you can start one from scratch. Yey! Click Next to get started.</span>
-      </header>
       <header ng-if="designer.type=='restore'">
           <h3>Restore a piston</h3>
           <span>Please enter the backup bin code below and click Create to get started.</span>
-          <p><b>NOTE:</b> Only backup bin codes created by your account are supported. All others will generate an empty piston.</p>
+          <p>You may restore public, anonymized backup codes shared by others or private backup codes created by your account. Private backup codes created by a different account cannot be restored.</p>
       </header>
       <header ng-if="designer.type=='import'">
-          <h3>Import a new piston</h3>
-          <span>You wanted to import a new piston. The bad news is, there is no way yet :( But the good news is, you can start one from scratch. Yey! Click Next to get started.</span>
+          <h3>Import pistons from a backup file</h3>
       </header>
-      <form>
+      <div ng-if="designer.type == 'import'">
+        <form ng-if="!importedPistons">
+          <p>Upload your backup file created by the Backup Pistons menu item on the dashboard then restore pistons.</p>
+          <div class="form-group">
+            <label for="backupFile">Backup file</label>
+            <input id="backupFile" name="backupFile" ng-model="designer.backupFile" type="file" accept=".backup" />
+          </div>
+        </form>
+        <div ng-if="importedPistons">
+          <p>The following pistons were included in the backup file. Pistons that you have already restored and existing pistons with a name matching the backup file are displayed at the end of the list.</p>
+          <div class="pull-right form-group form-group-sm form-inline">
+            <label for="import-sort" class="small">Sort by</label>
+            <select id="import-sort" ng-model="importedPistonsSortOrder" ng-change="sortImportedPistons(importedPistonsSortOrder)" class="form-control">
+              <option>safest</option>
+              <option>name</option>
+              <option>category</option>
+              <option value="created">created date</option>
+              <option value="modified">last modified</option>
+            </select>
+          </div>
+          <p>Some pistons in this list may show warnings to identify factors that may need to be reviewed when you import the piston. The "safest" sort order shows pistons with the fewest warnings first. Sorry, we can't restore categories, global variables, places, or other global settings yet.</p>
+          <ol>
+            <li ng-repeat="data in importedPistons track by data.meta.id" ng-class="{ 'text-muted': !!data.imported }">
+              <div class="btn-group btn-group-sm pull-right">
+                <button class="btn btn-sm" ng-class="data.imported ? 'btn-secondary' : 'btn-primary'" ng-click="restoreImportedPiston(data)">Restore {{data.imported ? ' again' : ''}}</button>
+                <button type="button" class="btn btn-sm btn-primary" ng-show="!!data.imported" ng-click="openPiston(data.imported); closeDialog()">View</button>
+                <button type="button" class="btn btn-sm btn-white" ng-click="removeImportedPiston(data.meta.id)"><i class="far fa-times fa-sm"></i></button>
+              </div>
+              <strong>{{data.meta.name}}</strong>
+              <div ng-if="data.warnings && data.warnings.length" class="text-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{data.warnings.join(', ')}}
+              </div>
+              <p>
+                Created by {{data.meta.author}} on {{data.meta.created | date}}<!-- 
+                --><span ng-if="data.meta.modified && data.meta.modified !== data.meta.created">, last edited {{data.meta.modified | date}}</span>
+              </p>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <form ng-if="designer.type != 'import'">
           <div class="form-group">
 	            <label for="author">Author</label>
                   <input class="form-control"  id="author" ng-model="designer.author" type="text" />
@@ -481,12 +524,14 @@
           <div class="divider" data-toggle="collapse" data-target="#advopt" collapsed-title="Show Advanced Options" expanded-title="Hide Advanced Options" aria-expanded="false"></div>
           <div id="advopt" class="form-group collapse">
               <label for="descriptionInput">Description (optional)</label>
-              <textarea type="text" id="descriptionInput" class="form-control" placeholder="Description for this statement" ng-model="designer.description"></textarea>
+              <textarea type="text" id="descriptionInput" class="form-control" placeholder="Description for this statement" ng-model="designer.description" msd-elastic></textarea>
           </div>
       </form>
 
       <footer>
-          <button type="button" class="btn btn-info pull-right" ng-disabled="!designer.type || !designer.author || !designer.name || ((designer.type == 'duplicate') && !designer.piston) || ((designer.type == 'restore') && !designer.bin)" ng-click="createPiston();">Create</button>
+          <button ng-if="designer.type != 'import'" type="button" class="btn btn-info pull-right" ng-disabled="!designer.type || !designer.author || !designer.name || ((designer.type == 'duplicate') && !designer.piston) || ((designer.type == 'restore') && !designer.bin)" ng-click="createPiston();">Create</button>
+          <button ng-if="designer.type == 'import' && !importedPistons" type="button" class="btn btn-info pull-right" ng-click="loadBackupFile();">Import</button>
+          <button ng-if="designer.type == 'import' && importedPistons" type="button" class="btn btn-info pull-right" ng-click="restartPistonImport();">New import</button>
           <button type="button" class="btn btn-default" ng-click="prevPage();">Back</button>
       </footer>
   </designer>
@@ -532,6 +577,7 @@
 <designer>
       <header>
           <h3>Backup piston(s)</h3>
+          <span>Use the New Piston button to restore pistons from a backup file. Note that categories, global variables, places, and other global settings are not included in the backup at this time.</span>
       </header>
 	<form ng-if="designer.page==0">
 		<div class="form-group">

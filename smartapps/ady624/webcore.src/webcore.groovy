@@ -18,8 +18,23 @@
  *
  *  Version history
 */
-public static String version() { return "v0.3.104.20180323" }
+public static String version() { return "v0.3.113.20210203" }
 /*
+ *	02/03/2021 >>> v0.3.113.20210203 - BETA M3 - Fixed GET, HEAD, DELETE web requests that used Send Variables (broken in 0.3.112)
+ *	02/02/2021 >>> v0.3.112.20210202 - BETA M3 - Fixed FORM type web requests that used Send Variables (broken in 0.3.111), improved a few confusing log messages
+ *	01/30/2021 >>> v0.3.111.20210130 - BETA M3 - Numerous bug fixes, performance improvements for HTTP, *CLEAR index to reset list variables, reset access token
+ *	10/09/2019 >>> v0.3.110.20191009 - BETA M3 - Load devices into dashboard in multiple batches when necessary, switch to FontAwesome Kit to always use latest version
+ *	08/22/2019 >>> v0.3.10f.20190822 - BETA M3 - Custom headers on web requests by @Bloodtick_Jones (write as JSON in Authorization header field), capabilities split into three pages to fix device selection errors
+ *	06/28/2019 >>> v0.3.10e.20190628 - BETA M3 - Reinstated dirty fix for dashboard timeouts after reports of increased error rates, NaN device status is back
+ *	06/27/2019 >>> v0.3.10d.20190627 - BETA M3 - Reverted attempted fix for dashboard timeouts, fixes NaN device status on piston editing, dashboard tweaks for Hubitat by E_Sch
+ *	05/22/2019 >>> v0.3.10c.20190522 - BETA M3 - Changed the device selection page in main app to fix timeout issues in Asia-Pacific
+ *	05/14/2019 >>> v0.3.10b.20190514 - BETA M3 - Changed the device selection page to fix timeout issues in Asia-Pacific
+ *	02/23/2019 >>> v0.3.10a.20190223 - BETA M3 - Added $twcweather to replace discontinued $weather, added new :twc-[iconCode]: weather icon set, fixed content type for local HTTP requests
+ *	12/07/2018 >>> v0.3.109.20181207 - BETA M3 - Dirty fix for dashboard timeouts: seems like ST has a lot of trouble reading the list of devices/commands/attributes/values these days, so giving up on reading values makes this much faster - temporarily?!
+ *	09/06/2018 >>> v0.3.108.20180906 - BETA M3 - Restore pistons from backup file, hide "(unknown)" SHM status, fixed string to date across DST thanks @bangali, null routines, integer trailing zero cast, saving large pistons and disappearing variables on mobile
+ *	08/06/2018 >>> v0.3.107.20180806 - BETA M3 - Font Awesome 5 icons, expanding textareas to fix expression scrolling, boolean date and datetime global variable editor fixes
+ *	07/31/2018 >>> v0.3.106.20180731 - BETA M3 - Contact Book removal support
+ *	06/28/2018 >>> v0.3.105.20180628 - BETA M3 - Reorder variables, collapse fuel streams, custom web request body, json and urlEncode functions
  *	03/23/2018 >>> v0.3.104.20180323 - BETA M3 - Fixed unexpected dashboard logouts, updating image urls in tiles, 12 am/pm in time(), unary negation following another operator
  *	02/24/2018 >>> v0.3.000.20180224 - BETA M3 - Dashboard redesign by @acd37, collapsible sidebar, fix "was" conditions on decimal attributes and log failures due to duration threshold
  *	01/16/2018 >>> v0.2.102.20180116 - BETA M2 - Fixed IE 11 script error, display of offset expression evaluation, blank device lists on piston restore, avoid error and log a warning when ST sunrise/sunset is blank
@@ -156,7 +171,7 @@ public static String version() { return "v0.3.104.20180323" }
  *	04/21/2017 >>> v0.0.07d.20170421 - ALPHA - Lots of improvements for device variables
  *	04/20/2017 >>> v0.0.07c.20170420 - ALPHA - Timed conditions are finally working (was* and changed/not changed), basic tests performed
  *	04/19/2017 >>> v0.0.07b.20170419 - ALPHA - First attempt to get 'was' conditions up and running
- *	04/19/2017 >>> v0.0.07a.20170419 - ALPHA - Minor bug fixes, triggers inside timers no longer subscribe to events (the timer is a trigger itself) - triggers should not normally be used inside timers
+ *	04/19/2017 >>> v0.0.07a.20170419 - ALPHA - Minor bug fixes, triggers inside timers no longer to events (the timer is a trigger itself) - triggers should not normally be used inside timers
  *	04/19/2017 >>> v0.0.079.20170419 - ALPHA - Time condition restrictions are now working, added date and date&time conditions, offsets still missing
  *	04/18/2017 >>> v0.0.078.20170418 - ALPHA - Time conditions now subscribe for time events - added restrictions to UI dialog, but not yet implemented
  *	04/18/2017 >>> v0.0.077.20170418 - ALPHA - Implemented time conditions - no date or datetime yet, also, no subscriptions for time events yet
@@ -308,11 +323,12 @@ preferences {
 	page(name: "pageInitializeDashboard")
 	page(name: "pageFinishInstall")
 	page(name: "pageSelectDevices")
-	page(name: "pageSelectContacts")
+	page(name: "pageSelectMoreDevices")
 	page(name: "pageSettings")
     page(name: "pageChangePassword")
     page(name: "pageSavePassword")
     page(name: "pageRebuildCache")
+    page(name: "pageResetEndpoint")
 	page(name: "pageRemove")
 }
 
@@ -511,7 +527,7 @@ private pageEngineBlock() {
 
 private pageSelectDevices() {
 	state.deviceVersion = now().toString()
-	dynamicPage(name: "pageSelectDevices", title: "", nextPage: state.installed ? null : (location.getContactBookEnabled() ? "pageSelectContacts" : "pageFinishInstall")) {
+	dynamicPage(name: "pageSelectDevices", title: "", nextPage: state.installed ? null : "pageFinishInstall") {
 		section() {
 			paragraph "${state.installed ? "Select the devices you want ${handle()} to have access to." : "Great, now let's select some devices."}"
             paragraph "It is a good idea to only select the devices you plan on using with ${handle()} pistons. Pistons will only have access to the devices you selected."
@@ -530,34 +546,22 @@ private pageSelectDevices() {
 			input "dev:actuator", "capability.actuator", multiple: true, title: "Which actuators", required: false
 			input "dev:sensor", "capability.sensor", multiple: true, title: "Which sensors", required: false
 		}
-
-		section ('Select devices by capability') {
-        	paragraph "If you cannot find a device by type, you may try looking for it by category below"
-			def d
-			for (capability in capabilities().findAll{ (!(it.value.d in [null, 'actuators', 'sensors'])) }.sort{ it.value.d }) {
-				if (capability.value.d != d) input "dev:${capability.key}", "capability.${capability.key}", multiple: true, title: "Which ${capability.value.d}", required: false
-				d = capability.value.d
-			}
-		}
+        
+        section () {
+	        href "pageSelectMoreDevices", title: "Select devices by capability", description: "If you cannot find a device by type, you may try looking for it by capability"
+        }
 	}
 }
 
-private pageSelectContacts() {
-	state.deviceVersion = now().toString()
-	dynamicPage(name: "pageSelectContacts", title: "", nextPage: state.installed ? null : "pageFinishInstall") {
-		section() {
-			paragraph "${state.installed ? "Select the contacts you want ${handle()} to have access to." : "Great, now let's select some contacts."}"
-        }
-        if (!state.installed) {
-        	section (Note) {
-            	paragraph "Remember, you can always come back to ${handle()} and add or remove contacts as needed.", required: true
-            }
-        	section() {
-            	paragraph "So go ahead, select a few contacts, then tap Next"
-            }
-        }
-        section () {
-			input "contacts", "contact", multiple: true, title: "Which contacts", required: false
+private pageSelectMoreDevices() {
+	dynamicPage(name: "pageSelectMoreDevices", title: "") {
+		section ('Select devices by capability') {
+        	paragraph "If you cannot find a device by type, you may try looking for it by capability below"
+			def d
+			for (capability in capabilities().findAll{ (!(it.value.d in [null, 'actuators', 'sensors'])) }.sort{ it.value.d }) {
+				if (capability.value.d != d) input "dev:${capability.key}", "capability.${capability.key}", multiple: true, title: "Which ${capability.value.d}", required: false, submitOnChange: true
+				d = capability.value.d
+			}
 		}
 	}
 }
@@ -587,19 +591,12 @@ def pageSettings() {
 
         def storageApp = getStorageApp()
         if (storageApp) {
-			section("Available devices and contacts") {
-	        	app([title: 'Available devices and contacts', multiple: false, install: true, uninstall: false], 'storage', 'ady624', "${handle()} Storage")
+			section("Available devices") {
+	        	app([title: 'Available devices', multiple: false, install: true, uninstall: false], 'storage', 'ady624', "${handle()} Storage")
 	        }
 		} else {
 			section("Available devices") {
 				href "pageSelectDevices", title: "Available devices", description: "Tap here to select which devices are available to pistons"
-			}
-			section("Available contacts") {
-				if (location.getContactBookEnabled()) {
-					href "pageSelectContacts", title: "Available contacts", description: "Tap here to select which contacts are available to pistons"
-				} else {
-    	        	paragraph "Your contact book is not enabled."
-        	    }
 			}
 		}
 /*		section("Integrations") {
@@ -620,6 +617,7 @@ def pageSettings() {
 
 		section(title: "Maintenance") {
 			paragraph "Memory usage is at ${mem()}", required: false
+			input "redirectContactBook", "bool", title: "Redirect all Contact Book requests as PUSH notifications", description: "SmartThings has removed the Contact Book feature and as a result, all uses of Contact Book are by default ignored. By enabling this option, you will get all the existing Contact Book uses fall back onto the PUSH notification system, possibly allowing other people to receive these notifications.", defaultValue: false, required: true
 			input "disabled", "bool", title: "Disable all pistons", description: "Disable all pistons belonging to this instance", defaultValue: false, required: false
 			href "pageRebuildCache", title: "Clean up and rebuild data cache", description: "Tap here to change your clean up and rebuild your data cache"
 		}
@@ -650,7 +648,13 @@ private pageSectionPIN() {
         input "PIN", "password", title: "Choose a security password for your dashboard", required: true
         input "expiry", "enum", options: ["Every hour", "Every day", "Every week", "Every month (recommended)", "Every three months", "Never (not recommended)"], defaultValue: "Every month (recommended)", title: "Choose how often the dashboard login expires", required: true
     }
-
+	if (settings.PIN) {
+		section() {
+			paragraph "The webCoRE dashboard uses an access token to communicate with the smart apps on your SmartThings account. In some cases SmartThings may invalidate an access token, or you may choose to invalidate it periodically for increased security.", required: false
+			paragraph "If your dashboard fails to load and no log messages appear in Live Logging when you refresh the dashboard, resetting the access token may restore access to webCoRE.", required: false
+			href "pageResetEndpoint", title: "Reset access token", description: "WARNING: External URLs for triggering pistons will need to be updated"
+		}
+	}
 }
 
 private pageSavePassword() {
@@ -669,6 +673,20 @@ def pageRebuildCache() {
     		paragraph "Success! Data cache has been cleaned up and rebuilt."
         }
     }
+}
+
+def pageResetEndpoint() {
+	revokeAccessToken()
+	state.endpoint = null
+	initializeWebCoREEndpoint()
+	initTokens()
+	registerInstance()
+	dynamicPage(name: "pageResetEndpoint", title: "", install: false, uninstall: false) {
+		section() {
+			paragraph "Success! Please sign out and back in to the webCoRE dashboard."
+			paragraph "If you use external URLs to trigger pistons, these URLs must be updated. See the piston detail page for an updated external URL; all pistons will use the same new token."
+		}
+	}
 }
 
 def pageIntegrations() {
@@ -872,7 +890,8 @@ private subscribeAll() {
 	subscribe(location, "${'@@' + handle()}", webCoREHandler)
 	subscribe(location, "askAlexa", askAlexaHandler)
 	subscribe(location, "echoSistant", echoSistantHandler)
-    subscribe(location, "HubUpdated", hubUpdatedHandler, [filterEvents: false])
+	subscribe(location, "hubInfo", hubInfoHandler, [filterEvents: false])
+	subscribe(location, "HubUpdated", hubUpdatedHandler, [filterEvents: false])
     subscribe(location, "summary", summaryHandler, [filterEvents: false])
     setPowerSource(getHub()?.isBatteryInUse() ? 'battery' : 'mains')
 }
@@ -886,6 +905,7 @@ private subscribeAll() {
 mappings {
 	//path("/dashboard") {action: [GET: "api_dashboard"]}
 	path("/intf/dashboard/load") {action: [GET: "api_intf_dashboard_load"]}
+	path("/intf/dashboard/devices") {action: [GET: "api_intf_dashboard_devices"]}
 	path("/intf/dashboard/refresh") {action: [GET: "api_intf_dashboard_refresh"]}
 	path("/intf/dashboard/piston/new") {action: [GET: "api_intf_dashboard_piston_new"]}
 	path("/intf/dashboard/piston/create") {action: [GET: "api_intf_dashboard_piston_create"]}
@@ -927,10 +947,9 @@ private api_get_error_result(error) {
     ]
 }
 
-private api_get_base_result(deviceVersion = 0, updateCache = false) {
+private api_get_base_result(updateCache = false) {
 	def tz = location.getTimeZone()
     def currentDeviceVersion = state.deviceVersion
-	def Boolean sendDevices = (deviceVersion != currentDeviceVersion)
     def name = handle() + ' Piston'
     def incidentThreshold = now() - 604800000
 	return [
@@ -949,7 +968,7 @@ private api_get_base_result(deviceVersion = 0, updateCache = false) {
             lifx: state.lifx ?: [:],
             virtualDevices: virtualDevices(updateCache),
             globalVars: listAvailableVariables(),
-        ] + (sendDevices ? [contacts: listAvailableContacts(false, updateCache), devices: listAvailableDevices(false, updateCache)] : [:]),
+        ],
         location: [
             contactBookEnabled: location.getContactBookEnabled(),
             hubs: location.getHubs().collect{ [id: hashId(it.id, updateCache), name: it.name, firmware: hubUID ? 'unknown' : it.getFirmwareVersionString(), physical: it.getType().toString().contains('PHYSICAL'), powerSource: it.isBatteryInUse() ? 'battery' : 'mains' ]},
@@ -971,6 +990,12 @@ private api_get_base_result(deviceVersion = 0, updateCache = false) {
     ]
 }
 
+private api_get_devices_result(offset = 0, updateCache = false) {
+	return listAvailableDevices(false, updateCache, offset) + [
+		deviceVersion: state.deviceVersion,
+	]
+}
+
 private api_intf_dashboard_load() {
 	def result
     recoveryHandler()
@@ -978,7 +1003,7 @@ private api_intf_dashboard_load() {
     def storageApp = getStorageApp(true)
     //debug "Dashboard: Request received to initialize instance"
 	if (verifySecurityToken(params.token)) {
-    	result = api_get_base_result(params.dev, true)
+    	result = api_get_base_result(true)
     	if (params.dashboard == "1") {
             startDashboard()
          } else {
@@ -994,6 +1019,19 @@ private api_intf_dashboard_load() {
             }
         }
         if (!result) result = api_get_error_result("ERR_INVALID_TOKEN")
+    }
+    //for accuracy, use the time as close as possible to the render
+    result.now = now()
+	render contentType: "application/javascript;charset=utf-8", data: "${params.callback}(${groovy.json.JsonOutput.toJson(result)})"
+}
+
+private api_intf_dashboard_devices() {
+	def result
+	if (verifySecurityToken(params.token)) {
+		def offset = "${params.offset}"
+    	result = api_get_devices_result(offset.isInteger() ? offset.toInteger() : 0)
+    } else {
+        result = api_get_error_result("ERR_INVALID_TOKEN")
     }
     //for accuracy, use the time as close as possible to the render
     result.now = now()
@@ -1050,7 +1088,7 @@ private api_intf_dashboard_piston_get() {
         def clientDbVersion = params.db
         def requireDb = serverDbVersion != clientDbVersion
         if (pistonId) {
-            result = api_get_base_result(requireDb ? 0 : params.dev, true)
+            result = [:]
             def piston = getChildApps().find{ hashId(it.id) == pistonId };
             if (piston) {
             	result.data = piston.get() ?: [:]
@@ -1652,7 +1690,7 @@ private cleanUp() {
         state.remove('modules')
         state.remove('globalVars')
         state.remove('devices')
-        api_get_base_result(1, true)
+        api_get_base_result(true)
 	} catch (all) {
     }
 }
@@ -1715,42 +1753,55 @@ private String getDashboardRegistrationUrl() {
 	return "https://api.${domain()}/dashboard/"
 }
 
-public Map listAvailableDevices(raw = false, updateCache = false) {
+public Map listAvailableDevices(raw = false, updateCache = false, offset = 0) {
 	def storageApp = getStorageApp()
-    Map result = [:]
-    if (storageApp) {
-    	result = storageApp.listAvailableDevices(raw)
+	Map result = [:]
+	if (storageApp) {
+		result = storageApp.listAvailableDevices(raw, offset)
 	} else {
+		def myDevices = settings.findAll{ it.key.startsWith("dev:") }.collect{ it.value }.flatten().sort{ it.getDisplayName() }
+		def devices = myDevices.unique{ it.id }
 		if (raw) {
-    		result = settings.findAll{ it.key.startsWith("dev:") }.collect{ it.value }.flatten().collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}
-    	} else {
-    		result = settings.findAll{ it.key.startsWith("dev:") }.collect{ it.value }.flatten().collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}.collectEntries{ id, dev -> [ (id): [ n: dev.getDisplayName(), cn: dev.getCapabilities()*.name, a: dev.getSupportedAttributes().unique{ it.name }.collect{def x = [n: it.name, t: it.getDataType(), o: it.getValues()]; try {x.v = dev.currentValue(x.n);} catch(all) {}; x}, c: dev.getSupportedCommands().unique{ it.getName() }.collect{[n: it.getName(), p: it.getArguments()]} ]]}
+			result = devices.collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}
+		} else {
+			def deviceCount = devices.size()
+			def time = now()
+			devices = devices[offset..-1]
+			result.devices = [:]
+			result.complete = !devices.indexed().find{ idx, dev ->
+				result.devices[hashId(dev.id)] = [
+					n: dev.getDisplayName(), 
+					cn: dev.getCapabilities()*.name, 
+					a: dev.getSupportedAttributes().unique{ it.name }.collect{[
+						n: it.name, 
+						t: it.getDataType(), 
+						o: it.getValues()
+					]}, 
+					c: dev.getSupportedCommands().unique{ it.getName() }.collect{[
+						n: it.getName(), 
+						p: it.getArguments()
+					]} 
+				]
+				// Stop after 10 seconds
+				if (idx < devices.size() - 1 && now() - time > 10000) {
+					result.nextOffset = offset + idx + 1
+					return true
+				}
+				false
+			}
 		}
 	}
-    List presenceDevices = getChildDevices()
-    if (presenceDevices && presenceDevices.size()) {
-		if (raw) {
-    		result << presenceDevices.collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}
-    	} else {
-    		result << presenceDevices.collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}.collectEntries{ id, dev -> [ (id): [ n: dev.getDisplayName(), cn: dev.getCapabilities()*.name, a: dev.getSupportedAttributes().unique{ it.name }.collect{def x = [n: it.name, t: it.getDataType(), o: it.getValues()]; try {x.v = dev.currentValue(x.n);} catch(all) {}; x}, c: dev.getSupportedCommands().unique{ it.getName() }.collect{[n: it.getName(), p: it.getArguments()]} ]]}
+	if (raw || result.complete) {
+		List presenceDevices = getChildDevices()
+		if (presenceDevices && presenceDevices.size()) {
+			if (raw) {
+				result << presenceDevices.collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}
+			} else {
+				result.devices << presenceDevices.collectEntries{ dev -> [(hashId(dev.id, updateCache)): dev]}.collectEntries{ id, dev -> [ (id): [ n: dev.getDisplayName(), cn: dev.getCapabilities()*.name, a: dev.getSupportedAttributes().unique{ it.name }.collect{def x = [n: it.name, t: it.getDataType(), o: it.getValues()]; try {x.v = dev.currentValue(x.n);} catch(all) {}; x}, c: dev.getSupportedCommands().unique{ it.getName() }.collect{[n: it.getName(), p: it.getArguments()]} ]]}
+			}
 		}
-    }
+	}
     return result
-}
-
-private Map listAvailableContacts(raw = false, updateCache = false) {
-	def storageApp = getStorageApp()
-    if (storageApp) return storageApp.listAvailableContacts(raw)
-    def contacts = [:]
-    for(contact in settings.contacts) {
-        def contactId = hashId(contact.id, updateCache);
-        if (raw) {
-            contacts[contactId] = contact
-        } else {
-            contacts[contactId] = [t: contact.name, f: contact.contact.firstName, l: contact.contact.lastName, p: "$contact".endsWith('PUSH')]
-        }
-    }
-    return contacts
 }
 
 private setPowerSource(powerSource, atomic = true) {
@@ -1786,11 +1837,10 @@ private Boolean verifySecurityToken(tokenId) {
     	atomicState.securityTokens = tokens
     }
 	def token = tokens[tokenId]
-    if (!token || token < now()) {
+    if (token && token < now()) {
         error "Dashboard: Authentication failed due to an invalid token"
-    	return false
     }
-    return true
+    return token && token >= now()
 }
 
 private String createSecurityToken() {
@@ -2022,7 +2072,7 @@ public Map getRunTimeData(semaphore = null, fetchWrappers = false) {
 		],
         comparisons: comparisons(),
         coreVersion: version(),
-    	contacts: (!!fetchWrappers ? (storageApp ? storageApp.listAvailableContacts(true) : listAvailableContacts(true)) : [:]),
+    	contacts: [:],
     	devices: (!!fetchWrappers ? (storageApp ? storageApp.listAvailableDevices(true) : listAvailableDevices(true)) : [:]),
         virtualDevices: virtualDevices(),
         globalVars: listAvailableVariables(),
@@ -2035,7 +2085,8 @@ public Map getRunTimeData(semaphore = null, fetchWrappers = false) {
         sunTimes: getSunTimes(),
         started: startTime,
         ended: now(),
-        generatedIn: now() - startTime
+        generatedIn: now() - startTime,
+        redirectContactBook: settings.redirectContactBook
     ]
 }
 
@@ -2138,7 +2189,6 @@ private broadcastPistonList() {
 def webCoREHandler(event) {
     if (!event || (!event.name.endsWith(handle()))) return;
     def data = event.jsonData ?: null
-    log.error "GOT EVENT WITH DATA $data"
     if (data && data.variable && (data.event == 'variable') && event.value && event.value.startsWith('@')) {
     	Map vars = atomicState.vars ?: [:]
         Map variable = data.variable
@@ -2208,6 +2258,30 @@ def echoSistantHandler(evt) {
 	}
 }
 
+// Used for current hubs
+def hubInfoHandler(evt) {
+    //log.debug "Hub info event received"
+    def hubInfo = evt.value
+    
+    // Get power source information
+    def powerSourceMatcher = hubInfo =~ "batterygpiostat:(\\d{2}),"
+    def powerSource = powerSourceMatcher[0][1]
+    //log.debug "Power Source is ${powerSource}"
+    
+    switch (powerSource) {
+        case "00":
+            setPowerSource('mains')
+            break
+        case "01":
+            setPowerSource('battery')
+            break
+        default:
+            log.error "Unrecognized hub power source value of ${powerSource}"
+            break
+       }
+}
+
+// Used for legacy hubs
 def hubUpdatedHandler(evt) {
 	if (evt.jsonData && (evt.jsonData.hubType == 'PHYSICAL') && evt.jsonData.data && evt.jsonData.data.batteryInUse) {
     	setPowerSource(evt.jsonData.data.batteryInUse ? 'battery' : 'mains')
@@ -2558,8 +2632,8 @@ private static Map commands() {
 		both						: [ n: "Strobe and Siren",																a: "alarm",							v: "both",																																			],
 		cancel						: [ n: "Cancel",																																																																],
 		close						: [ n: "Close",																			a: "doore",							v: "close",																																			],
-		configure					: [ n: "Configure",						i: 'gear',																																																										],
-		cool						: [ n: "Set to Cool",					i: 'asterisk',									a: "thermostatMode",				v: "cool",																																			],
+		configure					: [ n: "Configure",						i: 'cog',																																																										],
+		cool						: [ n: "Set to Cool",					i: 'snowflake', is: 'l',									a: "thermostatMode",				v: "cool",																																			],
 		deviceNotification			: [ n: "Send device notification...",	d: "Send device notification \"{0}\"",																		p: [[n:"Message",t:"string"]],  																							],
 		emergencyHeat				: [ n: "Set to Emergency Heat",															a: "thermostatMode",				v: "emergency heat",																																	],
 		fanAuto						: [ n: "Set fan to Auto",																a: "thermostatFanMode",				v: "auto",																																			],
@@ -2574,7 +2648,7 @@ private static Map commands() {
 		lock						: [ n: "Lock",							i: "lock",										a: "lock",							v: "locked",																																		],
 		mute						: [ n: "Mute",							i: 'volume-off',								a: "mute",							v: "muted",																																			],
 		nextTrack					: [ n: "Next track",																																																															],
-		off							: [ n: "Turn off",						i: "circle-o-notch",							a: "switch",						v: "off",																																			],
+		off							: [ n: "Turn off",						i: 'circle-notch',							a: "switch",						v: "off",																																			],
 		on							: [ n: "Turn on",						i: "power-off",									a: "switch",						v: "on",																																			],
 		open						: [ n: "Open",																			a: "door",							v: "open",																																			],
 		pause						: [ n: "Pause",																																																																	],
@@ -2589,15 +2663,15 @@ private static Map commands() {
 		presetPosition				: [ n: "Move to preset position",														a: "windowShade",					v: "partially open",																																],
 		previousTrack				: [ n: "Previous track",																																																														],
 		push						: [ n: "Push",																																																																	],
-		refresh						: [ n: "Refresh",					i: 'refresh',																																																											],
+		refresh						: [ n: "Refresh",					i: 'sync',																																																											],
 		restoreTrack				: [ n: "Restore track...",				d: "Restore track <uri>{0}</uri>",																			p: [[n:"Track URL",t:"url"]],  																								],
 		resumeTrack					: [ n: "Resume track...",				d: "Resume track <uri>{0}</uri>",																			p: [[n:"Track URL",t:"url"]],  																								],
-		setColor					: [ n: "Set color...",				i: 'barcode',	d: "Set color to {0}{1}",						a: "color",													p: [[n:"Color",t:"color"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],  							],
+		setColor					: [ n: "Set color...",				i: 'palette', is: "l",	d: "Set color to {0}{1}",						a: "color",													p: [[n:"Color",t:"color"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],  							],
 		setColorTemperature			: [ n: "Set color temperature...",		d: "Set color temperature to {0}°K{1}",			a: "colorTemperature",										p: [[n:"Color Temperature", t:"colorTemperature"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],	],
 		setConsumableStatus			: [ n: "Set consumable status...",		d: "Set consumable status to {0}",																			p: [[n:"Status", t:"consumable"]],																							],
 		setCoolingSetpoint			: [ n: "Set cooling point...",			d: "Set cooling point at {0}{T}",				a: "thermostatCoolingSetpoint",								p: [[n:"Desired temperature", t:"thermostatSetpoint"]], 																	],
 		setHeatingSetpoint			: [ n: "Set heating point...",			d: "Set heating point at {0}{T}",				a: "thermostatHeatingSetpoint",								p: [[n:"Desired temperature", t:"thermostatSetpoint"]], 																	],
-		setHue						: [ n: "Set hue...",				i: 'barcode',	d: "Set hue to {0}°{1}",			a: "hue",													p: [[n:"Hue", t:"hue"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]], 								],
+		setHue						: [ n: "Set hue...",				i: 'palette', is: "l",	d: "Set hue to {0}°{1}",			a: "hue",													p: [[n:"Hue", t:"hue"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]], 								],
 		setInfraredLevel			: [ n: "Set infrared level...",		i: 'signal',	d: "Set infrared level to {0}%{1}",	a: "infraredLevel",											p: [[n:"Level",t:"infraredLevel"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]], 					],
 		setLevel					: [ n: "Set level...",				i: 'signal',	d: "Set level to {0}%{1}",			a: "level",													p: [[n:"Level",t:"level"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]], 							],
 		setSaturation				: [ n: "Set saturation...",				d: "Set saturation to {0}{1}",					a: "saturation",											p: [[n:"Saturation", t:"saturation"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],					],
@@ -2679,34 +2753,34 @@ private static Map virtualCommands() {
     //t = type
     List tileIndexes = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16']
 	return [
-		noop						: [	n: "No operation",				a: true,	i: 'circle',				d: "No operation",																										],
-		wait						: [	n: "Wait...", 					a: true,	i: "clock-o",				d: "Wait {0}",															p: [[n:"Duration", t:"duration"]],				],
-		waitRandom					: [ n: "Wait randomly...",			a: true,	i: "clock-o",				d: "Wait randomly between {0} and {1}",									p: [[n:"At least", t:"duration"],[n:"At most", t:"duration"]],	],
-		waitForTime					: [ n: "Wait for time...",			a: true,	i: "clock-o",				d: "Wait until {0}",													p: [[n:"Time", t:"time"]],	],
-		waitForDateTime				: [ n: "Wait for date & time...",	a: true,	i: "clock-o",				d: "Wait until {0}",													p: [[n:"Date & Time", t:"datetime"]],	],
-		executePiston				: [ n: "Execute piston...",			a: true,	i: "clock-o",				d: "Execute piston \"{0}\"{1}",											p: [[n:"Piston", t:"piston"], [n:"Arguments", t:"variables", d:" with arguments {v}"],[n:"Wait for execution",t:"boolean",d:" and wait for execution to finish",w:"webCoRE can only wait on piston executions of pistons within the same instance as the caller. Please note that global variables updated in the callee piston do NOT get reflected immediately in the caller piston, the new values will be available on the next run."]],	],
-		pausePiston					: [ n: "Pause piston...",			a: true,	i: "clock-o",				d: "Pause piston \"{0}\"",												p: [[n:"Piston", t:"piston"]],	],
-		resumePiston				: [ n: "Resume piston...",			a: true,	i: "clock-o",				d: "Resume piston \"{0}\"",												p: [[n:"Piston", t:"piston"]],	],
-		executeRoutine				: [ n: "Execute routine...",		a: true,	i: "clock-o",				d: "Execute routine \"{0}\"",											p: [[n:"Routine", t:"routine"]],	],
+		noop						: [	n: "No operation",				a: true,	i: "circle",				d: "No operation",																										],
+		wait						: [	n: "Wait...", 					a: true,	i: "clock", is: "r",				d: "Wait {0}",															p: [[n:"Duration", t:"duration"]],				],
+		waitRandom					: [ n: "Wait randomly...",			a: true,	i: "clock", is: "r",				d: "Wait randomly between {0} and {1}",									p: [[n:"At least", t:"duration"],[n:"At most", t:"duration"]],	],
+		waitForTime					: [ n: "Wait for time...",			a: true,	i: "clock", is: "r",				d: "Wait until {0}",													p: [[n:"Time", t:"time"]],	],
+		waitForDateTime				: [ n: "Wait for date & time...",	a: true,	i: "clock", is: "r",				d: "Wait until {0}",													p: [[n:"Date & Time", t:"datetime"]],	],
+		executePiston				: [ n: "Execute piston...",			a: true,	i: "clock", is: "r",				d: "Execute piston \"{0}\"{1}",											p: [[n:"Piston", t:"piston"], [n:"Arguments", t:"variables", d:" with arguments {v}"],[n:"Wait for execution",t:"boolean",d:" and wait for execution to finish",w:"webCoRE can only wait on piston executions of pistons within the same instance as the caller. Please note that global variables updated in the callee piston do NOT get reflected immediately in the caller piston, the new values will be available on the next run."]],	],
+		pausePiston					: [ n: "Pause piston...",			a: true,	i: "clock", is: "r",				d: "Pause piston \"{0}\"",												p: [[n:"Piston", t:"piston"]],	],
+		resumePiston				: [ n: "Resume piston...",			a: true,	i: "clock", is: "r",				d: "Resume piston \"{0}\"",												p: [[n:"Piston", t:"piston"]],	],
+		executeRoutine				: [ n: "Execute routine...",		a: true,	i: "clock", is: "r",				d: "Execute routine \"{0}\"",											p: [[n:"Routine", t:"routine"]],	],
 		toggle						: [ n: "Toggle", r: ["on", "off"], 				i: "toggle-on"																				],
 		toggleRandom				: [ n: "Random toggle", r: ["on", "off"], 		i: "toggle-on",				d: "Random toggle{0}",													p: [[n:"Probability for on", t:"level", d:" with a {v}% probability for on"]],	],
 		setSwitch					: [ n: "Set switch...", r: ["on", "off"], 			i: "toggle-on",			d: "Set switch to {0}",													p: [[n:"Switch value", t:"switch"]],																],
-		setHSLColor					: [ n: "Set color... (hsl)", 					i: "barcode",				d: "Set color to H:{0}° / S:{1}% / L%:{2}{3}",				r: ["setColor"],				p: [[n:"Hue",t:"hue"], [n:"Saturation",t:"saturation"], [n:"Level",t:"level"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],  							],
+		setHSLColor					: [ n: "Set color... (hsl)", 					i: "palette", is: "l",				d: "Set color to H:{0}° / S:{1}% / L%:{2}{3}",				r: ["setColor"],				p: [[n:"Hue",t:"hue"], [n:"Saturation",t:"saturation"], [n:"Level",t:"level"], [n:"Only if switch is...", t:"enum",o:["on","off"], d:" if already {v}"]],  							],
 		toggleLevel					: [ n: "Toggle level...", 						i: "toggle-off",			d: "Toggle level between 0% and {0}%",	r: ["on", "off", "setLevel"],	p: [[n:"Level", t:"level"]],																																	],
-		sendNotification			: [ n: "Send notification...",		a: true,	i: "commenting-o",			d: "Send notification \"{0}\"",											p: [[n:"Message", t:"string"]],												],
-		sendPushNotification		: [ n: "Send PUSH notification...",	a: true,	i: "commenting-o",			d: "Send PUSH notification \"{0}\"{1}",									p: [[n:"Message", t:"string"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
-		sendSMSNotification			: [ n: "Send SMS notification...",	a: true,	i: "commenting-o",			d: "Send SMS notification \"{0}\" to {1}{2}",							p: [[n:"Message", t:"string"],[n:"Phone number",t:"phone"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
-		sendNotificationToContacts	: [ n: "Send notification to contacts...",a: true,i: "commenting-o",		d: "Send notification \"{0}\" to {1}{2}",								p: [[n:"Message", t:"string"],[n:"Contacts",t:"contacts"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
+		sendNotification			: [ n: "Send notification...",		a: true,	i: "comment-alt", is: "r",			d: "Send notification \"{0}\"",											p: [[n:"Message", t:"string"]],												],
+		sendPushNotification		: [ n: "Send PUSH notification...",	a: true,	i: "comment-alt", is: "r",			d: "Send PUSH notification \"{0}\"{1}",									p: [[n:"Message", t:"string"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
+		sendSMSNotification			: [ n: "Send SMS notification...",	a: true,	i: "comment-alt", is: "r",			d: "Send SMS notification \"{0}\" to {1}{2}",							p: [[n:"Message", t:"string"],[n:"Phone number",t:"phone"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
+		sendNotificationToContacts	: [ n: "Send notification to contacts...",a: true,i: "comment-alt", is: "r",		d: "Send notification \"{0}\" to {1}{2}",								p: [[n:"Message", t:"string"],[n:"Contacts",t:"contacts"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
 		log							: [ n: "Log to console...",			a: true,	i: "bug",					d: "Log {0} \"{1}\"{2}",												p: [[n:"Log type", t:"enum", o:["info","trace","debug","warn","error"]],[n:"Message",t:"string"],[n:"Store in Messages", t:"boolean", d:" and store in Messages", s:1]],	],
-		httpRequest					: [ n: "Make a web request",		a: true, 	i: "anchor",				d: "Make a {1} request to {0} with type {2}{3}",				        p: [[n:"URL", t:"uri"],[n:"Method", t:"enum", o:["GET","POST","PUT","DELETE","HEAD"]],[n:"Content Type", t:"enum", o:["JSON","FORM"]],[n:"Send variables", t:"variables", d:" and data {v}"],[n:"Authorization header", t:"string", d:"{v}"]],	],
-        setVariable					: [ n: "Set variable...",			a: true,	i: "superscript",			d: "Set variable {0} = {1}",											p: [[n:"Variable",t:"variable"],[n:"Value", t:"dynamic"]],	],
-        setState					: [ n: "Set piston state...",		a: true,	i: "superscript",			d: "Set piston state to \"{0}\"",										p: [[n:"State",t:"string"]],	],
-        setTileColor				: [ n: "Set piston tile colors...",	a: true,	i: "superscript",			d: "Set piston tile #{0} colors to {1} over {2}{3}",					p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Text Color",t:"color"],[n:"Background Color",t:"color"],[n:"Flash mode",t:"boolean",d:" (flashing)"]],	],
-        setTileTitle				: [ n: "Set piston tile title...",	a: true,	i: "superscript",			d: "Set piston tile #{0} title to \"{1}\"",								p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Title",t:"string"]],	],
-        setTileText					: [ n: "Set piston tile text...",	a: true,	i: "superscript",			d: "Set piston tile #{0} text to \"{1}\"",								p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Text",t:"string"]],	],
-        setTileFooter				: [ n: "Set piston tile footer...",	a: true,	i: "superscript",			d: "Set piston tile #{0} footer to \"{1}\"",							p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Footer",t:"string"]],	],
-        setTile						: [ n: "Set piston tile...",		a: true,	i: "superscript",			d: "Set piston tile #{0} title  to \"{1}\", text to \"{2}\", footer to \"{3}\", and colors to {4} over {5}{6}",		p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Title",t:"string"],[n:"Text",t:"string"],[n:"Footer",t:"string"],[n:"Text Color",t:"color"],[n:"Background Color",t:"color"],[n:"Flash mode",t:"boolean",d:" (flashing)"]],	],
-        clearTile					: [ n: "Clear piston tile...",		a: true,	i: "superscript",			d: "Clear piston tile #{0}",											p: [[n:"Tile Index",t:"enum",o:tileIndexes]],	],
+		httpRequest					: [ n: "Make a web request",		a: true, 	i: "anchor", is: "r",				d: "Make a {1} request to {0}",				        p: [[n:"URL", t:"uri"],[n:"Method", t:"enum", o:["GET","POST","PUT","DELETE","HEAD"]],[n:"Request body type", t:"enum", o:["JSON","FORM","CUSTOM"]],[n:"Send variables", t:"variables", d:"data {v}"],[n:"Request body", t:"string", d:"data {v}"],[n:"Request content type", t:"enum", o:["text/plain","text/html","application/json","application/x-www-form-urlencoded","application/xml"]],[n:"Authorization header", t:"string", d:"{v}"]],	],
+        setVariable					: [ n: "Set variable...",			a: true,	i: "superscript", is:"r",			d: "Set variable {0} = {1}",											p: [[n:"Variable",t:"variable"],[n:"Value", t:"dynamic"]],	],
+        setState					: [ n: "Set piston state...",		a: true,	i: "align-left", is:"l",			d: "Set piston state to \"{0}\"",										p: [[n:"State",t:"string"]],	],
+        setTileColor				: [ n: "Set piston tile colors...",	a: true,	i: "info-square", is:"l",			d: "Set piston tile #{0} colors to {1} over {2}{3}",					p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Text Color",t:"color"],[n:"Background Color",t:"color"],[n:"Flash mode",t:"boolean",d:" (flashing)"]],	],
+        setTileTitle				: [ n: "Set piston tile title...",	a: true,	i: "info-square", is:"l",			d: "Set piston tile #{0} title to \"{1}\"",								p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Title",t:"string"]],	],
+        setTileText					: [ n: "Set piston tile text...",	a: true,	i: "info-square", is:"l",			d: "Set piston tile #{0} text to \"{1}\"",								p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Text",t:"string"]],	],
+        setTileFooter				: [ n: "Set piston tile footer...",	a: true,	i: "info-square", is:"l",			d: "Set piston tile #{0} footer to \"{1}\"",							p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Footer",t:"string"]],	],
+        setTile						: [ n: "Set piston tile...",		a: true,	i: "info-square", is:"l",			d: "Set piston tile #{0} title  to \"{1}\", text to \"{2}\", footer to \"{3}\", and colors to {4} over {5}{6}",		p: [[n:"Tile Index",t:"enum",o:tileIndexes],[n:"Title",t:"string"],[n:"Text",t:"string"],[n:"Footer",t:"string"],[n:"Text Color",t:"color"],[n:"Background Color",t:"color"],[n:"Flash mode",t:"boolean",d:" (flashing)"]],	],
+        clearTile					: [ n: "Clear piston tile...",		a: true,	i: "info-square", is:"l",			d: "Clear piston tile #{0}",											p: [[n:"Tile Index",t:"enum",o:tileIndexes]],	],
 		setLocationMode				: [ n: "Set location mode...",		a: true,	i: "", 						d: "Set location mode to {0}", 											p: [[n:"Mode",t:"mode"]],																														],
 		setAlarmSystemStatus		: [ n: "Set Smart Home Monitor status...",	a: true, i: "",					d: "Set Smart Home Monitor status to {0}",								p: [[n:"Status", t:"alarmSystemStatus"]],																										],
 		sendEmail					: [ n: "Send email...",				a: true,	i: "envelope", 				d: "Send email with subject \"{1}\" to {0}", 							p: [[n:"Recipient",t:"email"],[n:"Subject",t:"string"],[n:"Message body",t:"string"]],																							],
@@ -2904,6 +2978,7 @@ private static Map functions() {
         dewpoint		: [ t: "decimal",	d: "dewPoint",		],
         fahrenheit		: [ t: "decimal",						],
         celsius			: [ t: "decimal",						],
+        converttemperatureifneeded : [ t: "decimal", d: "convertTemperatureIfNeeded", ],
         dateAdd			: [ t: "time",		d: "dateAdd",		],
         startswith		: [ t: "boolean",	d: "startsWith",	],
         endswith		: [ t: "boolean",	d: "endsWith",		],
@@ -2945,6 +3020,9 @@ private static Map functions() {
         rangevalue		: [ t: "dynamic",	d: "rangeValue"		],
         rainbowvalue	: [ t: "string",	d: "rainbowValue"	],
         distance		: [ t: "decimal"						],
+        json		: [ t: "dynamic"						],
+        urlencode		: [ t: "string",	d: "urlEncode"					],
+        encodeuricomponent		: [ t: "string",	d: "encodeURIComponent"					],
 	]
 }
 
@@ -2974,11 +3052,14 @@ private static Map getAlarmSystemStatusOptions() {
 }
 
 private Map getRoutineOptions(updateCache = false) {
-	def routines = location.helloHome?.getPhrases()
+    def routines = location.helloHome?.getPhrases()
     def result = [:]
-    for(routine in routines) {
-    	if (routine && routine?.label)
-    		result[hashId(routine.id, updateCache)] = routine.label
+    if (routines) {
+        routines = routines.sort{ it?.label ?: '' }
+        for(routine in routines) {
+            if (routine && routine?.label)
+                result[hashId(routine.id, updateCache)] = routine.label
+        }
     }
     return result
 }

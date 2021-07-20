@@ -518,10 +518,6 @@ error button {
 }
 
 
-.btn i {
-	height: 20px;
-	line-height: 20px;
-}
 
 
 label:not(.form-check-label) > input {
@@ -746,6 +742,12 @@ img.wu {
 span.swatch {
 	border-radius: 4px;
 	margin-right: 4px;
+}
+
+.sprite-icon {
+    width: 1em;
+    height: 1em;
+    vertical-align: -.125em;
 }
 
 
@@ -1067,6 +1069,7 @@ button .btn .btn-default active{
 }
 
 .collapse-control {
+  display: inline-block;
   transition: transform 0.2s ease-out;
   padding: 10px;
   margin: -5px -10px 0 0;
@@ -1143,10 +1146,6 @@ li[instance] {
   font-size: 15px;
   margin-top: -1px;
 }
-.sidebar .nav-sidebar > li > a > .fa {
-  width: 20px;
-  text-align: center;
-}
 
 .nav-sidebar .logo {
   position: relative;
@@ -1217,7 +1216,7 @@ li[instance] {
     z-index: 2;
     border-top-right-radius: 50%;
     border-bottom-right-radius: 50%;
-    padding: 8px;
+    padding: 6px;
     padding-left: 7px;
   }
   .main > .collapse-control:hover {
@@ -1229,13 +1228,13 @@ li[instance] {
   }
 
   /* Rotate the icon */
-  .main.allow-transition > .collapse-control::before {
+  .main.allow-transition > .collapse-control svg {
     transition: transform 0.5s ease-out;
   }
-  .main > .collapse-control::before {
+  .main > .collapse-control svg {
     display: inline-block;
   }
-  .main.sidebar-collapsed > .collapse-control::before {
+  .main.sidebar-collapsed > .collapse-control svg {
     transform: rotate(180deg);
   }
 
@@ -1254,10 +1253,10 @@ li[instance] {
     padding: 15px;
   }
 
-  .sidebar.allow-transition .nav-sidebar > li > a > .fa {
+  .sidebar.allow-transition .nav-sidebar > li > a > i > svg {
     transition: all 0.25s ease-out;
   }
-  .sidebar.sidebar-collapsed .nav-sidebar > li > a > .fa {
+  .sidebar.sidebar-collapsed .nav-sidebar > li > a > i > svg {
     transform: scale(1.3);
     width: 30px;
     padding-right: 10px;

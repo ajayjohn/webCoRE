@@ -1,4 +1,4 @@
-config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', '$interval', '$location', '$sce', '$routeParams', 'ngDialog', '$window', '$animate', function($scope, $rootScope, dataService, $timeout, $interval, $location, $sce, $routeParams, ngDialog, $window, $animate) {
+config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', '$interval', '$location', '$sce', '$routeParams', 'ngDialog', '$window', '$animate', '$q', function($scope, $rootScope, dataService, $timeout, $interval, $location, $sce, $routeParams, ngDialog, $window, $animate, $q) {
 	var tmrReveal;
 	var tmrStatus;
 	var tmrActivity;
@@ -33,6 +33,9 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 	};
 	$scope.weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	$scope.yearMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+	dataService.getImportedData().then(function(data) {
+		$scope.canResumeImport = data && data.length;
+	});
 
 	$scope.render = function(cancelTimer) {
 		//do nothing, but rerenders
@@ -172,6 +175,9 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				if (response.activity.globalVars) {
 					$scope.updateGlobalVars(response.activity.globalVars);
 				}
+				if (response.activity.systemVars) {
+					$scope.updateSystemVars(response.activity.systemVars);
+				}
 			}
 			tmrActivity = $timeout($scope.updateActivity, 3000);
 		}, function (error) {
@@ -182,7 +188,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 
 	$scope.updateGlobalVars = function(globalVars) {
 		$scope.globalVars = $scope.globalVars instanceof Object ? $scope.globalVars : {};
-		for (varName in globalVars) {
+		for (var varName in globalVars) {
 			var varType = globalVars[varName].t;
 			var varValue = globalVars[varName].v;
 			var v = $scope.globalVars[varName];
@@ -193,19 +199,40 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				if (v.v != varValue) v.v = varValue;
 			}
 		}
-		for (varName in $scope.globalVars) {
+		for (var varName in $scope.globalVars) {
 			if (!globalVars[varName]) delete($scope.globalVars[varName]);
+		}
+	}
+
+	$scope.updateSystemVars = function(systemVars) {
+		$scope.systemVars = $scope.systemVars instanceof Object ? $scope.systemVars : {};
+		for (var varName in systemVars) {
+			var varType = systemVars[varName].t;
+			var varValue = systemVars[varName].v;
+			var varValD = systemVars[varName].d;
+			var v = $scope.systemVars[varName];
+			if (!v) {
+				if (varValD) {
+					$scope.systemVars[varName] = {t: varType, v: varValue, d: true};
+				} else {
+					$scope.systemVars[varName] = {t: varType, v: varValue};
+				}
+			} else {
+				if (v.t != varType) v.t = varType;
+				if (v.v != varValue) v.v = varValue;
+			}
 		}
 	}
 
 	$scope.init = function() {
 		if ($scope.$$destroyed) return;	
 		dataService.setStatusCallback($scope.setStatus);
+		$scope.initialized = false;
 		$scope.loading = true;
 		if ($scope.piston) $scope.loading = true;
-		dataService.getPiston($scope.pistonId).then(function (response) {
+		dataService.getPiston($scope.pistonId, true).then(function (response) {
 			if ($scope.$$destroyed) return;
-			$scope.endpoint = data.endpoint + 'execute/' + $scope.pistonId;
+			$scope.endpoint = data.endpoint + 'execute/' + $scope.pistonId + (si.accessToken ? '?access_token=' + si.accessToken : '');
 			try {
 				var showOptions = $scope.piston ? !!$scope.showOptions : false;
 				if (!response || !response.data || !response.data.piston) {
@@ -265,50 +292,98 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 					$scope.piston.z = $scope.params && $scope.params.description ? $scope.params.description : '';
 					$scope.mode = 'edit';
 					if ($scope.params && $scope.params.type != 'blank') {
+						var getPiston;
 						switch ($scope.params.type) {
 							case 'duplicate':
 								if ($scope.params.piston) {
 									$scope.loading = true;
-									dataService.getPiston($scope.params.piston).then(function (response) {
-										$scope.loading = false;
-										if (response && response.data && response.data.piston) {
-											$scope.piston.o = response.data.piston.o ? response.data.piston.o : {};
-											$scope.piston.r = response.data.piston.r ? response.data.piston.r : [];
-											$scope.piston.rn = !!response.data.piston.rn;
-											$scope.piston.rop = response.data.piston.rop ? response.data.piston.rop : 'and';
-											$scope.piston.s = response.data.piston.s ? response.data.piston.s : [];
-											$scope.piston.v = response.data.piston.v ? response.data.piston.v : [];
-										}
-										$scope.initialized = true;
-										$scope.loading = false;
+									getPiston = dataService.getPiston($scope.params.piston).then(function (response) {
+										// Do not trigger a rebuild
+										delete response.data.piston.l;
+										return response.data.piston;
 									});
-									return;
 								}
 								break;
 							case 'restore':
 								if ($scope.params.bin) {
 									$scope.loading = true;
-									dataService.loadFromBin($scope.params.bin).then(function (response) {
-										var piston = response.data;
-										$scope.loading = false;
-										if (piston) {
-											$scope.piston.o = piston.o ? piston.o : {};
-											$scope.piston.r = piston.r ? piston.r : [];
-											$scope.piston.rn = !!piston.rn;
-											$scope.piston.rop = piston.rop ? piston.rop : 'and';
-											$scope.piston.s = piston.s ? piston.s : [];
-											$scope.piston.v = piston.v ? piston.v : [];
-											$scope.piston.z = piston.z ? piston.z : '';
-										}
-										$scope.initialized = true;
-										$scope.loading = false;
-										if (!!piston && (piston.l instanceof Object) && ($scope.objectToArray(piston.l).length)) {
-											$scope.rebuildPiston(piston.l);
-										}
+									getPiston = dataService.loadFromBin($scope.params.bin).then(function (response) {
+										return response.data;
 									});
-									return;
 								}
 								break;
+							case 'import':
+								if ($scope.params.piston) {
+									$scope.loading = true;
+									getPiston = $q.all([
+										dataService.loadFromImport($scope.params.piston),
+										dataService.getImportedData()
+									]).then(function (results) {
+										var pistonData = results[0];
+										var importData = results[1];
+										var queue = [pistonData.piston];
+										var pistonIdQueue = [];
+										// Find executePiston commands
+										while (queue.length) {
+											var obj = queue[0];
+											queue.shift();
+											if (obj instanceof Array) {
+												queue.push.apply(queue, obj);
+											} else if (obj instanceof Object) {
+												if (obj.c === 'executePiston') {
+													pistonIdQueue.push(obj.p[0]);
+												} else {
+													for (var key in obj) {
+														queue.push(obj[key]);
+													}
+												}
+											}
+										}
+										// If any Execute Piston commands found, fix any IDs that
+										// are mapped to an imported piston
+										while (pistonIdQueue.length) {
+											var obj = pistonIdQueue[0];
+											pistonIdQueue.shift();
+											if (typeof obj instanceof Array) {
+												pistonIdQueue.push.apply(pending, obj);
+											} else if (obj instanceof Object) {
+												for (var key in obj) {
+													if (typeof obj[key] === 'string' && obj[key][0] === ':') {
+														for (var i = 0; i < importData.length; i++) {
+															if (importData[i].meta.id === obj[key] && importData[i].imported) {
+																obj[key] = importData[i].imported;
+															}
+														}
+													} else {
+														pistonIdQueue.push(obj[key]);
+													}
+												}
+											}
+										}
+										return pistonData.piston;
+									});
+								}
+								break;
+						}
+						
+						if (getPiston) {
+							getPiston.then(function(piston) {
+								if (piston) {
+									$scope.piston.o = piston.o ? piston.o : {};
+									$scope.piston.r = piston.r ? piston.r : [];
+									$scope.piston.rn = !!piston.rn;
+									$scope.piston.rop = piston.rop ? piston.rop : 'and';
+									$scope.piston.s = piston.s ? piston.s : [];
+									$scope.piston.v = piston.v ? piston.v : [];
+									$scope.piston.z = piston.z ? piston.z : '';
+									
+									if ((piston.l instanceof Object) && ($scope.objectToArray(piston.l).length)) {
+										$scope.rebuildPiston(piston.l);
+									}
+								}
+								$scope.initialized = true;
+								$scope.loading = false;
+							});
 						}
 					}
 				}
@@ -511,6 +586,14 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		var promise = dataService.setPiston(piston, $scope.meta.bin, saveToBinOnly);
 		if (promise) promise.then(function(response) {
 			if (saveToBinOnly) return;
+			// Always pause imported pistons
+			if ($scope.params.type === 'import') {
+				return $scope.pause().then(function() {
+					return response;
+				});
+			}
+			return response;
+		}).then(function(response) {
 			$scope.loading = false;
 			if (response && response.data && response.data.build) {
 				$scope.meta.active = response.data.active;
@@ -520,12 +603,12 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				$scope.mode = 'view';
 				$scope.init();
 			}
-		});;
+		});
 	}
 
 	$scope.pause = function() {
 		$scope.loading = true;
-		dataService.pausePiston($scope.pistonId).then(function(data) {
+		return dataService.pausePiston($scope.pistonId).then(function(data) {
 			$scope.loading = false;
 			if (data && data.status && (data.status == 'ST_SUCCESS')) {
 				$scope.meta.active = data.active;
@@ -570,6 +653,12 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			$location.path('/');
 		});
 	}
+	
+	$scope.resumeImport = function() {
+		$rootScope.dashboardResumeImport = true;
+		$location.path('/');
+	}
+	
 	$scope.padComment = function(comment, sz) {
 		if (!comment) comment = '';
 		//replace LEFT-TO-RIGHT marks \u200E - Edge keeps adding them to date/times
@@ -597,7 +686,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		});
 	};
 
-	$scope.formatVariableValue = function(variable, name) {
+	$scope.formatVariableValue = nanomemoize(function(variable, name) {
 		if ((variable.v == null) && !!name && $scope.localVars) {
 			variable = $scope.copy(variable);
             variable.v = $scope.localVars[name];
@@ -620,7 +709,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			return angular.toJson(variable.v);
 		}
 		return variable.v;
-	}
+	});
 
 	$scope.deleteDialog = function() {
 		$scope.designer.dialog = ngDialog.open({
@@ -692,6 +781,9 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 					break;
 				case 'routine':
 					item.i = $scope.instance.virtualDevices['routine'].o;
+					break;
+				case 'rule':
+					item.i = $scope.instance.virtualDevices['rule'].o;
 					break;
 			}
 		}
@@ -787,7 +879,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 	$scope.getIFTTTUri = function(eventName) {
 		var uri = dataService.getApiUri();
 		if (!uri) return "An error has occurred retrieving the IFTTT Maker URL";
-		return uri + 'ifttt/' + eventName;
+		return uri + 'ifttt/' + eventName + (si.accessToken ? '?access_token=' + si.accessToken : '');
 	}
 
 	$scope.toggleAdvancedOptions = function() {
@@ -1060,18 +1152,18 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		window.designer = $scope.designer;
 		$scope.designer.items = {
 			simple: [
-				{ type: 'if', name: 'If Block', icon: 'code-fork', cssClass: 'info', description: 'An if block allows the piston to execute different actions depending on the truth result of a comparison or set of comparisons', button: 'an if' },
+				{ type: 'if', name: 'If Block', icon: 'code-branch', cssClass: 'info', description: 'An if block allows the piston to execute different actions depending on the truth result of a comparison or set of comparisons', button: 'an if' },
 				{ type: 'action', name: 'Action', icon: 'code', cssClass: 'success', description: 'An action allows the piston to control devices and execute tasks', button: 'an action' },
-				{ type: 'every', name: 'Timer', icon: 'clock-o', cssClass: 'warning', description: 'A timer will trigger execution of the piston at set time intervals', button: 'a timer' }
+				{ type: 'every', name: 'Timer', icon: 'clock', iconStyle: 'r', cssClass: 'warning', description: 'A timer will trigger execution of the piston at set time intervals', button: 'a timer' }
 			],
 			advanced: [
-				{ type: 'switch', name: 'Switch', icon: 'code-fork', cssClass: 'info', description: 'A switch statement compares an operand against a set of values and executes statements corresponding to those matches', button: 'a switch' },
+				{ type: 'switch', name: 'Switch', icon: 'code-branch', cssClass: 'info', description: 'A switch statement compares an operand against a set of values and executes statements corresponding to those matches', button: 'a switch' },
 				{ type: 'do', name: 'Do Block', icon: 'code', cssClass: 'success', description: 'A do block can help organize several statements into a single block', button: 'a do block' },
-				{ type: 'on', name: 'On event', icon: 'code-fork', cssClass: 'warning', description: 'An on event executes its statements only when certain events happen', button: 'an on event' },
-				{ type: 'for', name: 'For Loop', icon: 'circle-o-notch', cssClass: 'warning', description: 'A for loop executes the same statements for a set number of iteration cycles', button: 'a for loop' },
-				{ type: 'each', name: 'For Each Loop', icon: 'circle-o-notch', cssClass: 'warning', description: 'An each loop executes the same statements for each device in a device list', button: 'a for each loop' },
-				{ type: 'while', name: 'While Loop', icon: 'circle-o-notch', cssClass: 'warning', description: 'A while loop executes the same statements for as long as a condition is met', button: 'a while loop' },
-				{ type: 'repeat', name: 'Repeat Loop', icon: 'circle-o-notch', cssClass: 'warning', description: 'A repeat loop executes the same statements until a condition is met', button: 'a repeat loop' },
+				{ type: 'on', name: 'On event', icon: 'code-branch', cssClass: 'warning', description: 'An on event executes its statements only when certain events happen', button: 'an on event' },
+				{ type: 'for', name: 'For Loop', icon: 'circle-notch', cssClass: 'warning', description: 'A for loop executes the same statements for a set number of iteration cycles', button: 'a for loop' },
+				{ type: 'each', name: 'For Each Loop', icon: 'circle-notch', cssClass: 'warning', description: 'An each loop executes the same statements for each device in a device list', button: 'a for each loop' },
+				{ type: 'while', name: 'While Loop', icon: 'circle-notch', cssClass: 'warning', description: 'A while loop executes the same statements for as long as a condition is met', button: 'a while loop' },
+				{ type: 'repeat', name: 'Repeat Loop', icon: 'circle-notch', cssClass: 'warning', description: 'A repeat loop executes the same statements until a condition is met', button: 'a repeat loop' },
 				{ type: 'break', name: 'Break', icon: 'ban', cssClass: 'danger', description: 'A break allows the interruption of the inner most switch, for loop, for each loop, while loop, or repeat loop', button: 'a break' },
 				{ type: 'exit', name: 'Exit', icon: 'ban', cssClass: 'danger', description: 'An exit interrupts the piston execution and exits immediately', button: 'an exit' }
 			]
@@ -1480,7 +1572,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		window.designer = $scope.designer;
 		$scope.designer.items = [
 			{ type: 'condition', name: 'Condition', icon: 'code', cssClass: 'btn-info' },
-			{ type: 'group', name: 'Group', icon: 'code-fork', cssClass: 'btn-warning' },
+			{ type: 'group', name: 'Group', icon: 'code-branch', cssClass: 'btn-warning' },
 		];
 
 
@@ -1700,7 +1792,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
         window.designer = $scope.designer;
         $scope.designer.items = [
             { type: 'restriction', name: 'Restriction', icon: 'code', cssClass: 'btn-info' },
-            { type: 'group', name: 'Group', icon: 'code-fork', cssClass: 'btn-warning' },
+            { type: 'group', name: 'Group', icon: 'code-branch', cssClass: 'btn-warning' },
         ];
 
 
@@ -2061,7 +2153,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		$scope.designer.$new = variableName ? false : true;
 		$scope.designer.name = variableName ? '' + variableName : '@';
 		$scope.designer.type = variable.t;
-		$scope.designer.operand = {data: {t: !variable.v ? '' : ( variable.t == 'device' ? 'd' : 'c'), c:variable.v, d: variable.v}, multiple: false, dataType: variable.t, optional: true, onlyAllowConstants: true}
+		$scope.designer.operand = {data: {t: (variable.v == null || variable.v == undefined) ? '' : ( variable.t == 'device' ? 'd' : 'c'), c: variable.v, d: variable.v, vt: variable.t}, multiple: false, dataType: variable.t, optional: true, onlyAllowConstants: true}
 		window.designer = $scope.designer;
 		window.scope = $scope;
 		$scope.validateOperand($scope.designer.operand);
@@ -2134,43 +2226,27 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 );
 	}
 
-
-	$scope.getDeviceAttributeValue = function(device, attributeName) {
-		for(i in device.a) {
-			if (device.a[i].n == attributeName) {
-				var result = {v: device.a[i].v, t: device.a[i].v};
-				if (result.v == undefined) result.v = '';
-				if ((attributeName == 'battery') && (!isNaN(result.v))) {
-					result.t = result.t + '%';
-					result.v = Math.floor(parseInt(result.v) / 20);
-					if (result.v > 4) result.v = 4;
-				}
-				if ((attributeName == 'temperature') && (!isNaN(result.v))) {
-					result.v = Math.round(parseFloat(result.v)).toString() + '°';
-					result.t = result.v;
-				}
-				return result;
-			}
-		}
-		return {v:'', t:''};
-	}
-
 	$scope.renderDevice = function(device) {
-//		var result = '<div class="col-sm-7">' + device.n + '</div><div class="col-sm-1">1</div>' + '<div class="col-sm-1">2</div>' + '<div class="col-sm-1">3</div>' + '<div class="col-sm-1">4</div>' + '<div class="col-sm-1">5</div>';
-		var sSwitch = $scope.getDeviceAttributeValue(device, 'switch');
-		var sSwitch = sSwitch ? 'class="fa fa-toggle-off" switch="' + sSwitch + '"' : '';
-		var attributes = ['temperature', 'battery', 'switch', 'motion', 'presence'];
 		var result = '<div col>' + device.n + '</div>';
-		for (a in attributes) {
-			var value = $scope.getDeviceAttributeValue(device, attributes[a]);
-			result += '<div col ' + attributes[a] + '="' + value.v + '" title="' + value.t + '"></div>';
-		}
-//<div col ' + sSwitch + '> </div>' + '<div col motion="' + $scope.getDeviceAttributeValue(device, 'motion') + '"> </div>' + '<div col>3</div>' + '<div col>4</div>' + '<div col>5</div>';
 		return $sce.trustAsHtml(result);
 	}
 
 	$scope.drag = function(list, index) {
 		list.splice(index, 1);
+		$scope.autoSave();
+		$scope.doValidatePiston();
+	}
+
+	$scope.copyVariable = function(list, index) {
+		var variable = list[index];
+		for (var i = 0; i < list.length; i++) {
+			if (i !== index && list[i].n === variable.n) {
+				list[i].n = list[i].n.replace(/(?:_(\d+))?$/, function(m, number) {
+					return '_' + ((+number || 0) + 1);
+				});
+				break;
+			}
+		}
 		$scope.autoSave();
 		$scope.doValidatePiston();
 	}
@@ -2388,6 +2464,13 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 	$scope.getRoutineById = function(routineId) {
 		if ($scope.instance.virtualDevices.routine && $scope.instance.virtualDevices.routine.o) {
 			return $scope.instance.virtualDevices.routine.o[routineId];
+		}
+		return null;
+	}
+
+	$scope.getRuleById = function(ruleId) {
+		if ($scope.instance.virtualDevices.rule && $scope.instance.virtualDevices.rule.o) {
+			return $scope.instance.virtualDevices.rule.o[ruleId];
 		}
 		return null;
 	}
@@ -3021,6 +3104,10 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				operand.multiple = true;
 				dataType = 'routine';
 			}
+			if (dataType == 'rules') {
+				operand.multiple = true;
+				dataType = 'rule';
+			}
 			if (dataType == 'attributes') {
 				operand.multiple = true;
 				dataType = 'attribute';
@@ -3084,7 +3171,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 					break;
 			}
 
-			var disableExpressions = (!!operand.disableExpressions) || (dataType == 'piston') || (dataType == 'routine') || (dataType == 'askAlexaMacro') || (dataType == 'attribute')
+			var disableExpressions = (!!operand.disableExpressions) || (dataType == 'piston') || (dataType == 'routine') || (dataType == 'rule') || (dataType == 'askAlexaMacro') || (dataType == 'attribute')
 			operand.onlyAllowConstants = operand.onlyAllowConstants || disableExpressions
 
 			var strict = !!operand.strict;
@@ -3161,11 +3248,14 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				break;
 			case 'bool':
 			case 'boolean':
+				// Require string format to match the options
+				if ((operand.data.t == 'c') && (typeof operand.data.c == 'boolean')) operand.data.c += '';
 				operand.options = ['false', 'true'];
 				break;
 			case 'mode':
 			case 'powerSource':
 			case 'alarmSystemStatus':
+			case 'rule':
 			case 'routine':
 				operand.options = $scope.objectToArray($scope.instance.virtualDevices[dataType].o);
 				break;
@@ -3415,17 +3505,15 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 	};
 
 	$scope.refreshSelects = function(type) {
-		if (type) {
-			$scope.$$postDigest(function() {
+		type = type || 'selectpicker';
+		$scope.$$postDigest(function() {
+			$('select[' + type + ']').selectpicker('refresh');
+			$timeout(function() {
 				$('select[' + type + ']').selectpicker('refresh');
-				$timeout(function() {$('select[' + type + ']').selectpicker('refresh');}, 0, false);
-			});
-		} else {
-			$scope.$$postDigest(function() {
-				$('select[selectpicker]').selectpicker('refresh');
-				$timeout(function() {$('select[selectpicker]').selectpicker('refresh');}, 0, false);
-			});
-		}
+				// Match smart-area height to backing textarea
+				$('textarea').trigger('keyup');
+			}, 0, false);
+		});
 	}
 
 	$scope.getOrdinalSuffix = function(value) {
@@ -3560,7 +3648,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 
 		comparison.timed = comp ? comp.t : 0;
 
-		if ((comparison.parameterCount > 0) || (comparison.dataType == 'email')) {
+		if (comparison.right && ((comparison.parameterCount > 0) || (comparison.dataType == 'email'))) {
 			comparison.right.multiple = comparison.multiple;
 			comparison.right.disableAggregation = comparison.multiple;
 			comparison.right.dataType = (comparison.dataType == 'email' ? 'string' : comparison.left.selectedDataType);
@@ -3576,7 +3664,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			comparison.valid = comparison.valid && comparison.right.valid;
 		}
 
-		if ((comparison.parameterCount > 1) || (comparison.dataType == 'email')) {
+		if (comparison.right2 && ((comparison.parameterCount > 1) || (comparison.dataType == 'email'))) {
 			comparison.right2.multiple = comparison.multiple;
 			comparison.right2.disableAggregation = comparison.multiple;
 			comparison.right2.dataType = (comparison.dataType == 'email' ? 'string' : comparison.left.selectedDataType);
@@ -4067,7 +4155,23 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			}
 			display += ')';
 		} else {
-			display = !command.d ? command.n : command.d.replace(/\{(\d)\}/g, function(match, text) {
+			var displayFormat = command.d;
+			if (task.c === 'httpRequest') {
+				var method = task.p[1].c;
+				var useQueryString = method === 'GET' || method === 'DELETE' || method === 'HEAD';
+				var requestBodyType = task.p[2].c;
+				if (useQueryString) {
+					// with query [variables]
+					displayFormat += '[? with query {3}]';
+				} else if (requestBodyType === 'CUSTOM') {
+					// with data [request body] as type [content type]
+					displayFormat += '[? with {4}][? as type {5}]';
+				} else {
+					// with [request body type] encoded data [request body]
+					displayFormat += '[? with {2}][? encoded {3}]';
+				}
+			}
+			display = !displayFormat ? command.n : displayFormat.replace(/(?:\[\?(.*?))?\{(\d)\}(?:\s*\])?/g, function(match, prefix, text) {
 				var idx = parseInt(text);
 				if ((idx < 0) || (!task.p) || (idx >= task.p.length))
 					return ' (?) ';
@@ -4087,10 +4191,11 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				if (!!value && !!command.p[idx].d) {
 					value = (!!task.p[idx] && !!task.p[idx].t) ? command.p[idx].d.replace('{v}', value) : '';
 				}
-				return value;
+				return (value ? (prefix || '') : '') + value;
 			}).replace(/(\{T\})/g, '°' + $scope.location.temperatureScale);
 			var icon = command.i;
-			if (icon) display = '<span pun><i class="fa fa-' + icon + '" aria-hidden="true"></i></span> ' + display;
+			var iconStyle = (window.fontAwesomePro && command.is) || 's';
+			if (icon) display = '<span pun><i class="fa' + iconStyle + ' fa-' + icon + '"></i></span> ' + display;
 		}
 		if (task.m) {
 			display += ' <span pun><i>(only while ' + $scope.buildLocationModeNameList(task.m) + ')</i></span>';
@@ -4106,7 +4211,8 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 		suffix = (aggregation == 'any' ? 'or' : 'and');
 		var prefix = '';
 		if (devices instanceof Array) {
-			if (devices.length > 1) {
+			var isVariable = !$scope.getDeviceById(devices[0]);
+			if (devices.length > 1 || isVariable) {
 				switch (aggregation) {
 					case 'any':
 						prefix = 'Any of ';
@@ -4337,6 +4443,11 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 					var routine = $scope.getRoutineById(object);
 					if (routine) {
 						object = anonymizeValue(object, {t: 'routine'});
+							return object;
+					}
+					var rule = $scope.getRuleById(object);
+					if (rule) {
+						object = anonymizeValue(object, {t: 'rule'});
 							return object;
 					}
 					var contact = $scope.getContactById(object);
@@ -4630,6 +4741,37 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			$timeout(function() {
 				var width = piston.clientWidth + 10;
 				var height = piston.clientHeight + (anonymize ? 0 : 64) + 10;
+				// html2canvas cannot render SVGs; rasterize all icons to canvas first
+				var $svgs = $(piston).find('svg');
+				$svgs.each(function() {
+					var $svg = $(this);
+					// Size the canvas to match the actual icon rather than the svg
+					var iconWidth = $svg.find('path').width();
+					var iconHeight = $svg.find('path').height();
+					// Allow canvg to read the inherited color from style.color
+					$svg.css('color', $svg.css('color'));
+					var $canvas = $('<canvas class="snapshotSvgCanvas"></canvas>').attr({
+						width: iconWidth * 2,
+						height: iconHeight * 2
+					});
+					xml = (new XMLSerializer()).serializeToString(this);
+					// Avoid error in IE 
+					xml = xml.replace(/xmlns=\"http:\/\/www\.w3\.org\/2000\/svg\"/, '');
+					canvg($canvas[0], xml, { ignoreDimensions: true });
+					$svg.css('color', '');
+					// Align the canvas within the svg element bounds
+					var paddingX = ($svg.width() - iconWidth) / 2;
+					var paddingY = ($svg.height() - iconHeight) / 2;
+					$canvas.css({
+						width: iconWidth,
+						height: iconHeight,
+						paddingBottom: paddingY,
+						paddingLeft: paddingX,
+						paddingRight: paddingX,
+						paddingTop: paddingY,
+					});
+					$svg.hide().after($canvas).next();
+				});
 				html2canvas(piston, {width: width, height: height, counter: counter}).then(function(canvas) {
 					$scope.loading = false;
 					var reader = new window.FileReader();
@@ -4649,6 +4791,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 				});
 				piston.removeAttribute('printing');
 				piston.removeAttribute('anonymized');
+				$svgs.show().next('.snapshotSvgCanvas').remove();
 				delete($scope.view.exportBin);
 				$animate.enabled(true);
 			}, 1, false);
@@ -4713,7 +4856,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 			var dq = false;
 			var dv = false;
 			var startIndex = i;
-			function isCompositeVariable() {return (str.substr(startIndex, 6) == '$args.') || (str.substr(startIndex, 6) == '$json.') || (str.substr(startIndex, 10) == '$response.') || (str.substr(startIndex, 5) == '$nfl.') || (str.substr(startIndex, 8) == '$places.') || (str.substr(startIndex, 9) == '$weather.') || (str.substr(startIndex, 11) == '$incidents.') ||  (str.substr(startIndex, 6) == '$args[') || (str.substr(startIndex, 6) == '$json[') || (str.substr(startIndex, 8) == '$places[') || (str.substr(startIndex, 10) == '$response[') || (str.substr(startIndex, 11) == '$incidents[');};
+			function isCompositeVariable() {return (str.substr(startIndex, 6) == '$args.') || (str.substr(startIndex, 6) == '$json.') || (str.substr(startIndex, 10) == '$response.') || (str.substr(startIndex, 5) == '$nfl.') || (str.substr(startIndex, 8) == '$places.') || (str.substr(startIndex, 9) == '$weather.') || (str.substr(startIndex, 12) == '$twcweather.') || (str.substr(startIndex, 11) == '$incidents.') ||  (str.substr(startIndex, 6) == '$args[') || (str.substr(startIndex, 6) == '$json[') || (str.substr(startIndex, 8) == '$places[') || (str.substr(startIndex, 10) == '$response[') || (str.substr(startIndex, 11) == '$incidents[');};
 			function addOperand() {
 				if (i-1 > startIndex) {
 					var value = str.slice(startIndex, i-1).trim();
@@ -5035,6 +5178,7 @@ config.controller('piston', ['$scope', '$rootScope', 'dataService', '$timeout', 
 							if (item.x.startsWith('$response[') && (item.x.length > 10)) break;
 							if (item.x.startsWith('$nfl.') && (item.x.length > 5)) break;
 							if (item.x.startsWith('$weather.') && (item.x.length > 9)) break;
+							if (item.x.startsWith('$twcweather.') && (item.x.length > 12)) break;
 							if (item.x.startsWith('$incidents.') && (item.x.length > 11)) break;
 							if (item.x.startsWith('$incidents[') && (item.x.length > 11)) break;
 							if ($scope.systemVars && $scope.systemVars[item.x]) break;
